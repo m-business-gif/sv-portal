@@ -757,6 +757,8 @@ function renderSVTable(){
     const mp=tgt?Math.round(mk/tgt*100):0;
     const ok=d.filter(s=>(s.達成率||0)>=100).length;
     const sva=d.reduce((a,s)=>a+(s.SV売上実績||0),0);
+    const royal=d.reduce((a,s)=>a+(s.ロイヤリティ実績||0),0);
+    const royalTgt=d.reduce((a,s)=>a+(s.ロイヤリティ目標||0),0);
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:${svc(sv)};flex-shrink:0"></div><strong>${sv}</strong></div></td>
       <td class="num">${d.length}店</td>
@@ -764,13 +766,14 @@ function renderSVTable(){
       <td class="num" style="color:${pcc(p)};font-weight:700">${p}%</td>
       <td class="num" style="color:${pcc(mp)};font-weight:700">${mp}%</td>
       <td class="num">${ok} / ${d.length}</td>
+      <td class="num">¥${fm(royal)} / ¥${fm(royalTgt)}</td>
       <td class="num">¥${fm(sva)}</td>
     </tr>`;
   });
   const T=stores.reduce((a,s)=>a+(s.売上目標||0),0),A=stores.reduce((a,s)=>a+(s.実績売上||0),0),MK=stores.reduce((a,s)=>a+(s.見込み売上||0),0);
   const P=T?Math.round(A/T*100):0,MP=T?Math.round(MK/T*100):0;
   el.innerHTML=`<table class="svt">
-    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>SV売上実績</th></tr></thead>
+    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ実績 / 目標</th><th>SV売上実績</th></tr></thead>
     <tbody>${rows.join("")}
     <tr style="font-weight:700;background:var(--sur2)">
       <td>合計</td><td class="num">${stores.length}店</td>
@@ -778,6 +781,7 @@ function renderSVTable(){
       <td class="num" style="color:${pcc(P)};font-weight:700">${P}%</td>
       <td class="num" style="color:${pcc(MP)};font-weight:700">${MP}%</td>
       <td class="num">${stores.filter(s=>(s.達成率||0)>=100).length} / ${stores.length}</td>
+      <td class="num">¥${fm(stores.reduce((a,s)=>a+(s.ロイヤリティ実績||0),0))} / ¥${fm(stores.reduce((a,s)=>a+(s.ロイヤリティ目標||0),0))}</td>
       <td class="num">¥${fm(stores.reduce((a,s)=>a+(s.SV売上実績||0),0))}</td>
     </tr></tbody>
   </table>`;
