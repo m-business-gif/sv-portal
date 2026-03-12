@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SV加盟店管理ポータル</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f0f3f8;--sur:#fff;--sur2:#f7f9fc;--sur3:#eef1f8;
+  --bdr:#e4e8f0;--bdr2:#edf0f7;
+  --ink:#0f1623;--ink2:#3d4760;--ink3:#8b93a8;
+  --acc:#2563eb;--acc2:#eff4ff;
+  --grn:#16a34a;--grn2:#f0fdf4;--grn3:#dcfce7;
+  --amb:#c97c0a;--amb2:#fffbeb;
+  --red:#dc2626;--red2:#fef2f2;
+  --blue:#3b82f6;--blue2:#eff6ff;
+  --sh:0 1px 3px rgba(0,0,0,.07);--sh2:0 8px 28px rgba(0,0,0,.12);
+  --r:10px;--r2:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+
+/* SIDEBAR */
+.sb{position:fixed;top:0;left:0;bottom:0;width:220px;background:#0f172a;color:#c8d0e0;display:flex;flex-direction:column;z-index:40;overflow-y:auto}
+.sb-logo{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+.sb-logo-t{font-family:'Outfit',sans-serif;font-size:14px;font-weight:900;letter-spacing:.1em;color:#fff;text-transform:uppercase}
+.sb-logo-s{font-size:10px;color:rgba(255,255,255,.3);margin-top:3px}
+.sb-sec{padding:14px 0 4px}
+.sb-sec-l{padding:0 18px 6px;font-size:9px;font-weight:700;letter-spacing:.16em;color:rgba(255,255,255,.2);text-transform:uppercase}
+.sb-btn{display:flex;align-items:center;gap:9px;padding:9px 18px;font-size:12.5px;font-family:'Noto Sans JP',sans-serif;font-weight:500;color:rgba(255,255,255,.45);cursor:pointer;border:none;background:none;width:100%;text-align:left;border-left:3px solid transparent;transition:all .15s}
+.sb-btn:hover{color:rgba(255,255,255,.85);background:rgba(255,255,255,.05)}
+.sb-btn.on{color:#fff;background:rgba(255,255,255,.08);border-left-color:#60a5fa}
+.sv-nav{display:flex;align-items:center;gap:8px;padding:7px 18px;font-size:12px;color:rgba(255,255,255,.35);cursor:pointer;transition:all .15s;border-radius:0}
+.sv-nav:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.04)}
+.sv-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sb-foot{margin-top:auto;padding:14px 18px;border-top:1px solid rgba(255,255,255,.07)}
+.me-chip{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.07);border-radius:20px;padding:7px 12px}
+.me-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.me-nm{font-size:12px;color:rgba(255,255,255,.8)}
+.me-change{font-size:10px;color:rgba(255,255,255,.3);cursor:pointer;margin-left:auto;padding:2px 4px}
+.me-change:hover{color:rgba(255,255,255,.7)}
+
+/* MAIN */
+.main{margin-left:220px;display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:var(--sur);border-bottom:1px solid var(--bdr);height:54px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;box-shadow:var(--sh)}
+.pg-title{font-family:'Outfit',sans-serif;font-size:15px;font-weight:700}
+.tb-r{display:flex;align-items:center;gap:8px}
+.vtog{display:flex;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r2);padding:3px;gap:2px}
+.vtb{padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600;font-family:'Noto Sans JP',sans-serif;cursor:pointer;border:none;background:transparent;color:var(--ink3);transition:all .15s}
+.vtb.on{background:var(--sur);color:var(--ink);box-shadow:var(--sh)}
+.btn-p{display:flex;align-items:center;gap:6px;background:var(--acc);color:#fff;border:none;padding:7px 14px;border-radius:var(--r2);font-family:'Noto Sans JP',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap}
+.btn-p:hover{background:#1d4ed8}
+.icon-btn{width:32px;height:32px;border-radius:var(--r2);border:1px solid var(--bdr);background:var(--sur);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink2);transition:all .15s}
+.icon-btn:hover{border-color:var(--acc);color:var(--acc)}
+.content{padding:22px;flex:1}
+
+/* STATUS */
+.sync-tag{display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:10px;font-weight:600}
+.sync-tag.ok{color:var(--grn);background:var(--grn2)}
+.sync-tag.err{color:var(--red);background:var(--red2)}
+.sync-tag.loading{color:var(--ink3);background:var(--sur2)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.spinner{width:14px;height:14px;border:2px solid var(--bdr);border-top-color:var(--ink3);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SETUP */
+.setup-banner{background:linear-gradient(135deg,#1e3a8a,#2563eb);border-radius:var(--r);padding:22px 26px;color:#fff;margin-bottom:20px}
+.setup-ttl{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px}
+.setup-sub{font-size:12.5px;opacity:.8;margin-bottom:16px;line-height:1.7}
+.setup-row{display:flex;gap:8px}
+.setup-inp{flex:1;padding:9px 12px;border-radius:var(--r2);border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-family:'Noto Sans JP',sans-serif;font-size:13px;outline:none}
+.setup-inp::placeholder{color:rgba(255,255,255,.45)}
+.setup-inp:focus{border-color:rgba(255,255,255,.8)}
+.setup-go{padding:9px 20px;border-radius:var(--r2);border:none;background:#fff;color:#1e3a8a;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+
+/* SUMMARY CARDS */
+.sum-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.sc{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sc.cb::before{background:var(--acc)}
+.sc.cg::before{background:var(--grn)}
+.sc.ca::before{background:var(--amb)}
+.sc.cr::before{background:var(--red)}
+.sc.cp::before{background:#7c3aed}
+.sc-l{font-size:10px;font-weight:700;letter-spacing:.07em;color:var(--ink3);text-transform:uppercase;margin-bottom:6px}
+.sc-v{font-family:'Outfit',sans-serif;font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.sc-s{font-size:11px;color:var(--ink3);margin-top:4px}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.srch{flex:1;min-width:160px;position:relative}
+.srch svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink3);pointer-events:none}
+.srch input{width:100%;padding:8px 10px 8px 32px;border:1px solid var(--bdr);border-radius:var(--r2);font-family:'Noto Sans JP',sans-serif;font-size:13px;background:var(--sur);color:var(--ink);outline:none;transition:border-color .15s}
+.srch input:focus{border-color:var(--acc)}
+.sel{padding:8px 10px;border:1px solid var(--bdr);border-radius:var(--r2);font-family:'Noto Sans JP',sans-serif;font-size:13px;background:var(--sur);color:var(--ink);outline:none;cursor:pointer}
+
+/* STORE GRID */
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;transition:box-shadow .2s,transform .2s}
+.card:hover{box-shadow:var(--sh2);transform:translateY(-2px)}
+.c-head{padding:13px 15px 11px;border-bottom:1px solid var(--bdr2);display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.c-name{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px}
+.c-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.c-meta{margin-top:4px}
+.sv-tag{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:3px;color:#fff}
+.pct-lg{font-family:'Outfit',sans-serif;font-size:17px;font-weight:800;text-align:right}
+.pct-sm{font-size:10px;color:var(--ink3);text-align:right;margin-top:1px}
+
+/* KPI */
+.c-kpi{padding:11px 15px 10px;border-bottom:1px solid var(--bdr2)}
+.kpi-row{display:flex;gap:10px;margin-bottom:8px}
+.ki{flex:1}
+.ki-l{font-size:9.5px;font-weight:700;letter-spacing:.05em;color:var(--ink3);text-transform:uppercase;margin-bottom:2px}
+.ki-v{font-family:'Outfit',sans-serif;font-size:17px;font-weight:700;line-height:1}
+.ki-s{font-size:10px;color:var(--ink3);margin-top:2px}
+.prog{height:4px;background:var(--bdr);border-radius:2px;overflow:hidden}
+.prog-f{height:100%;border-radius:2px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.prog-row{display:flex;justify-content:space-between;margin-top:4px}
+.prog-p{font-family:'Outfit',sans-serif;font-size:11px;font-weight:700}
+.prog-d{font-size:10.5px;color:var(--ink3)}
+
+/* MIKOMI BOX */
+.mikomi-box{margin-top:9px;padding:8px 10px;background:linear-gradient(135deg,#eff6ff,#ecfdf5);border:1px solid #bfdbfe;border-radius:6px}
+.mikomi-hd{font-size:9.5px;font-weight:700;letter-spacing:.07em;color:#3b82f6;text-transform:uppercase;margin-bottom:5px}
+.mikomi-row{display:flex;align-items:center;gap:10px}
+.mikomi-main{font-family:'Outfit',sans-serif;font-size:15px;font-weight:800}
+.mikomi-pct{font-size:11.5px;font-weight:700;margin-left:3px}
+.mikomi-sub{font-size:11px;color:var(--ink3);flex:1}
+.mikomi-bar{height:3px;background:#dbeafe;border-radius:2px;overflow:hidden;margin-top:5px}
+.mikomi-bar-f{height:100%;border-radius:2px;transition:width .7s}
+
+/* TASKS */
+.c-tasks{padding:10px 15px;border-bottom:1px solid var(--bdr2)}
+.ct-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ct-ttl{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
+.ct-edit{font-size:11px;color:var(--acc);cursor:pointer;font-weight:700;background:none;border:none;font-family:inherit;padding:0}
+
+/* Text inputs inline */
+.task-field{margin-bottom:7px}
+.tf-label{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--ink3);text-transform:uppercase;margin-bottom:3px}
+.tf-input{width:100%;font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:5px 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--sur2);color:var(--ink);outline:none;transition:border-color .15s;resize:none}
+.tf-input:focus{border-color:var(--acc);background:var(--sur)}
+.tf-input.has-val{background:var(--blue2);border-color:#bfdbfe}
+
+/* Checkbox style */
+.chk-row{display:flex;gap:8px;margin-top:4px}
+.chk-item{flex:1;display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:5px;border:1.5px solid var(--bdr);background:var(--sur2);cursor:pointer;transition:all .15s;user-select:none}
+.chk-item:hover{border-color:var(--acc);background:var(--acc2)}
+.chk-item.checked{border-color:var(--grn);background:var(--grn2)}
+.chk-box{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--bdr);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--sur)}
+.chk-item.checked .chk-box{background:var(--grn);border-color:var(--grn)}
+.chk-lbl{font-size:11.5px;font-weight:600;color:var(--ink3)}
+.chk-item.checked .chk-lbl{color:var(--grn)}
+
+/* MEMO */
+.c-memo{padding:10px 15px 13px}
+.memo-l{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--ink3);text-transform:uppercase;margin-bottom:5px}
+.memo-ta{width:100%;font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;resize:none;min-height:52px;outline:none;background:var(--sur2);color:var(--ink);transition:border-color .15s;line-height:1.6}
+.memo-ta:focus{border-color:var(--acc);background:var(--sur)}
+.memo-ta.has-val{background:var(--blue2);border-color:#bfdbfe}
+.save-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:5px}
+.save-st{font-size:11px;color:var(--ink3)}
+.save-btn{padding:4px 14px;border-radius:4px;border:none;background:var(--acc);color:#fff;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:none}
+.save-btn:hover{background:#1d4ed8}
+
+/* ═══ 見込み進捗タブ ═══ */
+.mikomi-page{display:none}
+.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.sv-progress-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.spc-head{padding:14px 16px 12px;border-bottom:1px solid var(--bdr2);display:flex;align-items:center;gap:10px}
+.spc-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit',sans-serif;font-size:16px;font-weight:800;color:#fff;flex-shrink:0}
+.spc-info{flex:1}
+.spc-name{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700}
+.spc-sub{font-size:11px;color:var(--ink3);margin-top:2px}
+.spc-pct{font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;text-align:right}
+.spc-body{padding:12px 16px}
+.spc-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.spc-ki{background:var(--sur2);border-radius:6px;padding:8px 10px}
+.spc-ki-l{font-size:9.5px;font-weight:700;letter-spacing:.05em;color:var(--ink3);text-transform:uppercase;margin-bottom:3px}
+.spc-ki-row{display:flex;align-items:baseline;gap:4px}
+.spc-ki-v{font-family:'Outfit',sans-serif;font-size:15px;font-weight:700}
+.spc-ki-m{font-size:11px;color:var(--blue);font-weight:600}
+.spc-ki-s{font-size:10px;color:var(--ink3);margin-top:1px}
+.spc-prog{height:5px;background:var(--bdr);border-radius:3px;overflow:hidden;margin-top:8px}
+.spc-prog-f{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.spc-prog-row{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.spc-prog-l{font-size:10px;color:var(--ink3)}
+.spc-prog-r{font-family:'Outfit',sans-serif;font-size:11px;font-weight:700}
+
+/* STORE MIKOMI TABLE */
+.sm-table-wrap{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:20px}
+.sm-table-hd{padding:12px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.sm-table-ttl{font-family:'Outfit',sans-serif;font-size:13px;font-weight:700}
+.smt{width:100%;border-collapse:collapse}
+.smt th{padding:9px 14px;text-align:right;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);background:var(--sur2);border-bottom:1px solid var(--bdr);text-transform:uppercase;white-space:nowrap}
+.smt th:first-child,.smt th:nth-child(2){text-align:left}
+.smt td{padding:9px 14px;font-size:12.5px;border-bottom:1px solid var(--bdr2);text-align:right;white-space:nowrap}
+.smt td:first-child,.smt td:nth-child(2){text-align:left}
+.smt tr:last-child td{border-bottom:none}
+.smt tr:hover td{background:var(--sur2)}
+.smt-nm{font-weight:600;display:flex;align-items:center;gap:6px}
+.smt-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.num{font-family:'Outfit',sans-serif;font-weight:600}
+.pct-cell{font-family:'Outfit',sans-serif;font-weight:700}
+.arr-up{color:var(--grn)}
+.arr-dn{color:var(--red)}
+
+/* TASK BOARD */
+.tbd{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tbc{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:13px}
+.tbc-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tbc-ttl{font-size:11.5px;font-weight:700}
+.tbc-ct{background:var(--sur);border-radius:10px;padding:1px 8px;font-size:10.5px;font-weight:700;color:var(--ink3)}
+.tc{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r2);padding:10px 12px;margin-bottom:8px;box-shadow:var(--sh);cursor:pointer;transition:all .15s}
+.tc:hover{box-shadow:var(--sh2)}
+.tc-ttl{font-size:12.5px;font-weight:600;margin-bottom:5px;line-height:1.4}
+.tc-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ttag{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:3px}
+
+/* SV TABLE */
+.svt{width:100%;border-collapse:collapse;background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.svt th{padding:10px 14px;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ink3);background:var(--sur2);border-bottom:1px solid var(--bdr);text-transform:uppercase}
+.svt td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--bdr2)}
+.svt tr:last-child td{border-bottom:none}
+.svt tr:hover td{background:var(--sur2)}
+
+/* ERROR */
+.err-box{background:var(--red2);border:1px solid #fecaca;border-radius:var(--r);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--red);line-height:1.7}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+</style>
+</head>
+<body>
+
+<aside class="sb">
+  <div class="sb-logo">
+    <div class="sb-logo-t">SV Portal</div>
+    <div class="sb-logo-s">加盟店管理 2026.03</div>
+  </div>
+  <div class="sb-sec">
+    <div class="sb-sec-l">ナビゲーション</div>
+    <button class="sb-btn on" id="nav-stores" onclick="showView('stores',this)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      加盟店一覧
+    </button>
+    <button class="sb-btn" id="nav-mikomi" onclick="showView('mikomi',this)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      見込み進捗
+    </button>
+    <button class="sb-btn" id="nav-tasks" onclick="showView('tasks',this)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      タスクボード
+    </button>
+    <button class="sb-btn" id="nav-sv" onclick="showView('sv',this)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      SV別集計
+    </button>
+  </div>
+  <div class="sb-sec">
+    <div class="sb-sec-l">SV担当</div>
+    <div id="sb-svs"></div>
+  </div>
+  <div class="sb-foot">
+    <div class="me-chip">
+      <div class="me-av" id="me-av">?</div>
+      <span class="me-nm" id="me-nm">---</span>
+      <span class="me-change" onclick="changeSV()">✎</span>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="pg-title" id="pg-title">加盟店一覧</div>
+    <div class="tb-r">
+      <div id="sync-ind"></div>
+      <div class="vtog" id="vtog">
+        <button class="vtb on" onclick="setMode('all',this)">全体</button>
+        <button class="vtb" onclick="setMode('mine',this)">マイ担当</button>
+      </div>
+      <button class="icon-btn" onclick="loadData()" title="更新">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="content" id="content"></div>
+</div>
+
+<script>
+const SVC={"山田":"#2563eb","髙橋":"#7c3aed","向井":"#0891b2","子龍":"#059669","宮脇":"#c2410c"};
+const svc=sv=>SVC[sv]||"#6b7280";
+const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
+const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
+const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
+
+let API_URL=localStorage.getItem("gas_url")||"";
+let mySV=localStorage.getItem("my_sv")||"";
+let mode="all";
+let stores=[],tasks=[];
+let curView="stores";
+
+window.addEventListener("DOMContentLoaded",()=>{
+  if(!mySV){mySV=prompt("SV名を入力（例: 山田、髙橋、向井、子龍、宮脇）")||"SV";localStorage.setItem("my_sv",mySV);}
+  setUserUI();
+  renderContent();
+});
+
+function setUserUI(){
+  document.getElementById("me-nm").textContent=mySV;
+  const av=document.getElementById("me-av");
+  av.textContent=mySV[0];av.style.background=svc(mySV);
+}
+function changeSV(){const n=prompt("SV名を入力",mySV);if(n){mySV=n;localStorage.setItem("my_sv",n);setUserUI();render();}}
+
+function renderContent(){
+  const el=document.getElementById("content");
+  if(!API_URL){
+    el.innerHTML=`
+      <div class="setup-banner">
+        <div class="setup-ttl">🔗 Googleスプレッドシート API設定</div>
+        <div class="setup-sub">GASをデプロイして発行されたURLを貼り付けてください。</div>
+        <div class="setup-row">
+          <input class="setup-inp" id="url-inp" placeholder="https://script.google.com/macros/s/.../exec">
+          <button class="setup-go" onclick="setURL()">接続</button>
+        </div>
+      </div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div class="sum-grid" id="sum"></div>
+    <div id="v-stores">
+      <div class="toolbar">
+        <div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="q" placeholder="店舗名・SV名で検索..." oninput="renderCards()">
+        </div>
+        <select class="sel" id="f-sv" onchange="renderCards()"><option value="">全SV</option></select>
+        <select class="sel" id="f-pct" onchange="renderCards()">
+          <option value="">達成状況：全て</option><option value="ok">達成（100%以上）</option>
+          <option value="warn">注意（80〜99%）</option><option value="ng">未達（79%以下）</option>
+        </select>
+        <select class="sel" id="f-sort" onchange="renderCards()">
+          <option value="sv">SV順</option><option value="pd">達成率：高い順</option>
+          <option value="pa">達成率：低い順</option><option value="nm">店舗名順</option>
+        </select>
+      </div>
+      <div class="sg" id="grid"></div>
+    </div>
+    <div id="v-mikomi" class="mikomi-page"></div>
+    <div id="v-tasks" style="display:none"></div>
+    <div id="v-sv" style="display:none"></div>`;
+  loadData();
+}
+
+function setURL(){
+  const v=document.getElementById("url-inp").value.trim();
+  if(!v.startsWith("https://script.google.com")){alert("正しいGASのURLを入力してください");return;}
+  API_URL=v;localStorage.setItem("gas_url",v);renderContent();
+}
+
+async function loadData(){
+  setSyncStatus("loading");
+  try{
+    const res=await fetch(API_URL);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    stores=data.stores||[];tasks=data.tasks||[];
+    setSyncStatus("ok");
+    initSelects();render();
+  }catch(e){
+    setSyncStatus("err");
+    const g=document.getElementById("grid");
+    if(g)g.innerHTML=`<div style="grid-column:1/-1"><div class="err-box">⚠ データ取得失敗: ${e.message}<br><a href="#" onclick="resetURL()" style="color:var(--acc)">URLを再設定</a></div></div>`;
+  }
+}
+function resetURL(){API_URL="";localStorage.removeItem("gas_url");renderContent();}
+
+function setSyncStatus(s){
+  const el=document.getElementById("sync-ind");if(!el)return;
+  if(s==="ok")el.innerHTML=`<div class="sync-tag ok"><div class="sync-dot"></div>同期中</div>`;
+  else if(s==="err")el.innerHTML=`<div class="sync-tag err">⚠ エラー</div>`;
+  else el.innerHTML=`<div class="sync-tag loading"><div class="spinner"></div></div>`;
+}
+
+function initSelects(){
+  const svs=[...new Set(stores.map(s=>s.sv))].sort();
+  document.getElementById("sb-svs").innerHTML=svs.map(sv=>
+    `<div class="sv-nav" onclick="filterSV('${sv}')"><div class="sv-dot" style="background:${svc(sv)}"></div>${sv}（${stores.filter(s=>s.sv===sv).length}店）</div>`
+  ).join("");
+  const opts=svs.map(sv=>`<option value="${sv}">${sv}</option>`).join("");
+  ["f-sv"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=`<option value="">全SV</option>${opts}`;});
+}
+
+function render(){renderSum();renderCards();renderMikomi();renderTasks();renderSVTable();}
+
+function getStores(){return mode==="mine"?stores.filter(s=>s.sv===mySV):stores;}
+
+// ─ SUMMARY ─
+function renderSum(){
+  const el=document.getElementById("sum");if(!el)return;
+  const d=getStores();
+  const tgt=d.reduce((a,s)=>a+(s.売上目標||0),0);
+  const act=d.reduce((a,s)=>a+(s.実績売上||0),0);
+  const mk=d.reduce((a,s)=>a+(s.見込み売上||0),0);
+  const p=tgt?Math.round(act/tgt*100):0;
+  const mp=tgt?Math.round(mk/tgt*100):0;
+  const ok=d.filter(s=>(s.達成率||0)>=100).length;
+  const need=tasks.filter(t=>t.sv===mySV&&(!t.スタッフMTG||!t.オーナーMTG)).length;
+  el.innerHTML=[
+    {l:"管理店舗",v:d.length+"店",s:mode==="mine"?mySV+"担当":"全SV合計",c:"cb"},
+    {l:"売上達成率",v:p+"%",s:"¥"+fm(act)+" / ¥"+fm(tgt),c:pcc(p).replace("var(--","c").replace(")","")},
+    {l:"月末見込み達成率",v:mp+"%",s:"見込み¥"+fm(mk),c:"cp"},
+    {l:"達成店舗",v:ok+"店",s:"全"+d.length+"店中",c:"cg"},
+    {l:"要対応MTG",v:need+"件",s:mySV+"担当",c:"ca"},
+  ].map(c=>`<div class="sc ${c.c}"><div class="sc-l">${c.l}</div><div class="sc-v">${c.v}</div><div class="sc-s">${c.s}</div></div>`).join("");
+}
+
+// ─ STORE CARDS ─
+function renderCards(){
+  const el=document.getElementById("grid");if(!el)return;
+  let d=getStores();
+  const q=(document.getElementById("q")||{}).value||"";
+  const fsv=(document.getElementById("f-sv")||{}).value||"";
+  const fp=(document.getElementById("f-pct")||{}).value||"";
+  const fs=(document.getElementById("f-sort")||{}).value||"sv";
+  if(q)d=d.filter(s=>s.name.includes(q)||s.sv.includes(q));
+  if(fsv)d=d.filter(s=>s.sv===fsv);
+  if(fp==="ok")d=d.filter(s=>(s.達成率||0)>=100);
+  if(fp==="warn")d=d.filter(s=>(s.達成率||0)>=80&&(s.達成率||0)<100);
+  if(fp==="ng")d=d.filter(s=>(s.達成率||0)<80);
+  if(fs==="pd")d.sort((a,b)=>(b.達成率||0)-(a.達成率||0));
+  if(fs==="pa")d.sort((a,b)=>(a.達成率||0)-(b.達成率||0));
+  if(fs==="nm")d.sort((a,b)=>a.name.localeCompare(b.name,"ja"));
+  if(!d.length){el.innerHTML='<div style="padding:40px;color:var(--ink3)">該当する店舗がありません</div>';return;}
+  el.innerHTML=d.map(s=>storeCard(s)).join("");
+}
+
+function storeCard(s){
+  const p=s.達成率??0;
+  const pc=pcc(p);
+  const c=svc(s.sv);
+  const t=tasks.find(t=>t.store===s.name)||{};
+  const id=s.name.replace(/[^\w]/g,"_");
+  const mp=pcc(s.見込み達成率||0);
+  const vp=s.総客数目標>0?Math.min(Math.round(s.総客数実績/s.総客数目標*100),999):null;
+
+  return `<div class="card" id="card-${id}">
+  <div class="c-head">
+    <div>
+      <div class="c-name"><div class="c-dot" style="background:${c}"></div>${s.name}</div>
+      <div class="c-meta"><span class="sv-tag" style="background:${c}">${s.sv}</span></div>
+    </div>
+    <div>
+      <div class="pct-lg" style="color:${pc}">${p>0?p+"%":"—"}</div>
+      <div class="pct-sm">${p>=100?"✓ 達成":p>=80?"△ 注意":"✕ 未達"}</div>
+    </div>
+  </div>
+  <div class="c-kpi">
+    <div class="kpi-row">
+      <div class="ki"><div class="ki-l">売上実績</div><div class="ki-v" style="color:${pc}">¥${fk(s.実績売上)}</div><div class="ki-s">目標 ¥${fk(s.売上目標)}</div></div>
+      <div class="ki"><div class="ki-l">総客数</div><div class="ki-v">${s.総客数実績}<span style="font-size:11px;color:var(--ink3)">人</span></div><div class="ki-s">目標 ${s.総客数目標}人</div></div>
+      <div class="ki"><div class="ki-l">客単価</div><div class="ki-v">${s.客単価実績?Math.round(s.客単価実績).toLocaleString():"—"}<span style="font-size:10px;color:var(--ink3)">円</span></div><div class="ki-s">目標 ${s.客単価目標>0?Math.round(s.客単価目標).toLocaleString():"—"}円</div></div>
+    </div>
+    <div class="prog"><div class="prog-f" style="width:${Math.min(p,100)}%;background:${pc}"></div></div>
+    <div class="prog-row"><span class="prog-p" style="color:${pc}">${p}%</span><span class="prog-d">客数${vp!=null?vp+"%":"—"} / SV売上¥${fk(s.SV売上実績)}</span></div>
+    ${s.見込み売上?`
+    <div class="mikomi-box">
+      <div class="mikomi-hd">📈 月末見込み</div>
+      <div class="mikomi-row">
+        <div><span class="mikomi-main" style="color:${mp}">¥${fk(s.見込み売上)}</span><span class="mikomi-pct" style="color:${mp}">${s.見込み達成率}%</span></div>
+        <div class="mikomi-sub">客数${s.見込み総客数||"—"}人 / 単価${s.見込み客単価?Math.round(s.見込み客単価).toLocaleString():"—"}円</div>
+      </div>
+      <div class="mikomi-bar"><div class="mikomi-bar-f" style="width:${Math.min(s.見込み達成率||0,100)}%;background:${mp}"></div></div>
+    </div>`:""}
+  </div>
+  <div class="c-tasks">
+    <div class="ct-hd"><div class="ct-ttl">タスク・MTG</div></div>
+    <div class="task-field">
+      <div class="tf-label">実行中の施策</div>
+      <textarea class="tf-input ${t.施策?'has-val':''}" id="tf-shisku-${id}" rows="2" placeholder="施策内容を入力..." onchange="autoSave('${s.name.replace(/'/g,"\\'")}','施策',this.value)">${t.施策||""}</textarea>
+    </div>
+    <div class="task-field">
+      <div class="tf-label">次回予約特典</div>
+      <textarea class="tf-input ${t.次回予約特典?'has-val':''}" id="tf-yoyaku-${id}" rows="1" placeholder="特典内容を入力..." onchange="autoSave('${s.name.replace(/'/g,"\\'")}','次回予約特典',this.value)">${t.次回予約特典||""}</textarea>
+    </div>
+    <div class="chk-row">
+      <div class="chk-item ${t.スタッフMTG?'checked':''}" id="chk-smtg-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','スタッフMTG','${id}')">
+        <div class="chk-box">${t.スタッフMTG?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
+        <span class="chk-lbl">スタッフMTG</span>
+      </div>
+      <div class="chk-item ${t.オーナーMTG?'checked':''}" id="chk-omtg-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','オーナーMTG','${id}')">
+        <div class="chk-box">${t.オーナーMTG?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
+        <span class="chk-lbl">オーナーMTG</span>
+      </div>
+    </div>
+    ${t.未実行タスク?`<div style="margin-top:6px;padding:5px 8px;background:var(--amb2);border-radius:4px;font-size:11px;color:var(--amb)">⚠ ${t.未実行タスク}</div>`:""}
+  </div>
+</div>`;
+}
+
+// ─ 見込み進捗タブ ─
+function renderMikomi(){
+  const el=document.getElementById("v-mikomi");if(!el)return;
+  const svs=[...new Set(stores.map(s=>s.sv))].sort();
+
+  // SV別サマリーカード
+  const cards=svs.map(sv=>{
+    const d=stores.filter(s=>s.sv===sv);
+    const tgt=d.reduce((a,s)=>a+(s.売上目標||0),0);
+    const act=d.reduce((a,s)=>a+(s.実績売上||0),0);
+    const mk=d.reduce((a,s)=>a+(s.見込み売上||0),0);
+    const p=tgt?Math.round(act/tgt*100):0;
+    const mp=tgt?Math.round(mk/tgt*100):0;
+    const pc=pcc(p);const mpc=pcc(mp);
+    const ok=d.filter(s=>(s.達成率||0)>=100).length;
+    const mkOk=d.filter(s=>(s.見込み達成率||0)>=100).length;
+    const avgMk=d.filter(s=>s.見込み達成率).reduce((a,s)=>a+s.見込み達成率,0)/Math.max(d.filter(s=>s.見込み達成率).length,1);
+    return `<div class="sv-progress-card">
+      <div class="spc-head">
+        <div class="spc-av" style="background:${svc(sv)}">${sv[0]}</div>
+        <div class="spc-info">
+          <div class="spc-name">${sv}</div>
+          <div class="spc-sub">${d.length}店舗担当 / 達成${ok}店 / 見込達成${mkOk}店</div>
+        </div>
+        <div class="spc-pct" style="color:${mpc}">${mp}%</div>
+      </div>
+      <div class="spc-body">
+        <div class="spc-kpi-grid">
+          <div class="spc-ki">
+            <div class="spc-ki-l">売上実績</div>
+            <div class="spc-ki-row"><div class="spc-ki-v" style="color:${pc}">¥${fm(act)}</div></div>
+            <div class="spc-ki-s">目標 ¥${fm(tgt)}</div>
+          </div>
+          <div class="spc-ki">
+            <div class="spc-ki-l">月末見込み</div>
+            <div class="spc-ki-row"><div class="spc-ki-v" style="color:${mpc}">¥${fm(mk)}</div></div>
+            <div class="spc-ki-s">見込達成率 ${mp}%</div>
+          </div>
+          <div class="spc-ki">
+            <div class="spc-ki-l">実績達成率</div>
+            <div class="spc-ki-row"><div class="spc-ki-v" style="color:${pc}">${p}%</div></div>
+            <div class="spc-ki-s">達成${ok} / 未達${d.length-ok}店</div>
+          </div>
+          <div class="spc-ki">
+            <div class="spc-ki-l">平均見込率</div>
+            <div class="spc-ki-row"><div class="spc-ki-v" style="color:${pcc(avgMk)}">${Math.round(avgMk)}%</div></div>
+            <div class="spc-ki-s">店舗平均</div>
+          </div>
+        </div>
+        <div class="spc-prog"><div class="spc-prog-f" style="width:${Math.min(mp,100)}%;background:${mpc}"></div></div>
+        <div class="spc-prog-row"><span class="spc-prog-l">見込み達成率</span><span class="spc-prog-r" style="color:${mpc}">${mp}%</span></div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // 店舗別見込みテーブル
+  const filterSV=mode==="mine"?mySV:"";
+  const tblRows=stores
+    .filter(s=>!filterSV||s.sv===filterSV)
+    .sort((a,b)=>(b.見込み達成率||0)-(a.見込み達成率||0))
+    .map(s=>{
+      const mp=s.見込み達成率||0;
+      const mpc=pcc(mp);
+      const diff=mp-(s.達成率||0);
+      const arrow=diff>0?`<span class="arr-up">▲${diff.toFixed(1)}</span>`:`<span class="arr-dn">▼${Math.abs(diff).toFixed(1)}</span>`;
+      return `<tr>
+        <td><div class="smt-nm"><div class="smt-dot" style="background:${svc(s.sv)}"></div>${s.name}</div></td>
+        <td>${s.sv}</td>
+        <td class="num">¥${fk(s.実績売上)}</td>
+        <td class="pct-cell" style="color:${pcc(s.達成率||0)}">${s.達成率||"—"}%</td>
+        <td class="num">¥${fk(s.見込み売上)}</td>
+        <td class="pct-cell" style="color:${mpc}">${mp||"—"}%</td>
+        <td class="num">${s.見込み総客数||"—"}人</td>
+        <td class="num">${s.見込み客単価?Math.round(s.見込み客単価).toLocaleString():"—"}円</td>
+        <td>${arrow}</td>
+      </tr>`;
+    }).join("");
+
+  el.innerHTML=`
+    <div class="mp-grid">${cards}</div>
+    <div class="sm-table-wrap">
+      <div class="sm-table-hd">
+        <div class="sm-table-ttl">店舗別 見込み数値一覧</div>
+        <select class="sel" id="mk-sv" onchange="renderMikomi()" style="font-size:12px;padding:5px 8px">
+          <option value="">全SV</option>
+          ${[...new Set(stores.map(s=>s.sv))].sort().map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="smt">
+          <thead><tr>
+            <th>店舗名</th><th>SV</th><th>売上実績</th><th>実績率</th>
+            <th>見込み売上</th><th>見込み率</th><th>見込み客数</th><th>見込み単価</th><th>実績→見込み</th>
+          </tr></thead>
+          <tbody>${tblRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // フィルター再バインド
+  const mkSvEl=document.getElementById("mk-sv");
+  if(mkSvEl)mkSvEl.onchange=()=>{
+    const sv=mkSvEl.value;
+    const rows=stores.filter(s=>!sv||s.sv===sv).sort((a,b)=>(b.見込み達成率||0)-(a.見込み達成率||0));
+    el.querySelector("tbody").innerHTML=rows.map(s=>{
+      const mp=s.見込み達成率||0;const mpc=pcc(mp);
+      const diff=mp-(s.達成率||0);
+      const arrow=diff>0?`<span class="arr-up">▲${diff.toFixed(1)}</span>`:`<span class="arr-dn">▼${Math.abs(diff).toFixed(1)}</span>`;
+      return `<tr><td><div class="smt-nm"><div class="smt-dot" style="background:${svc(s.sv)}"></div>${s.name}</div></td>
+        <td>${s.sv}</td><td class="num">¥${fk(s.実績売上)}</td>
+        <td class="pct-cell" style="color:${pcc(s.達成率||0)}">${s.達成率||"—"}%</td>
+        <td class="num">¥${fk(s.見込み売上)}</td><td class="pct-cell" style="color:${mpc}">${mp||"—"}%</td>
+        <td class="num">${s.見込み総客数||"—"}人</td><td class="num">${s.見込み客単価?Math.round(s.見込み客単価).toLocaleString():"—"}円</td>
+        <td>${arrow}</td></tr>`;
+    }).join("");
+  };
+}
+
+// ─ TASK BOARD ─
+function renderTasks(){
+  const el=document.getElementById("v-tasks");if(!el)return;
+  let d=mode==="mine"?tasks.filter(t=>t.sv===mySV):tasks;
+  const has=d.filter(t=>t.施策);
+  const done=d.filter(t=>t.スタッフMTG&&t.オーナーMTG);
+  const need=d.filter(t=>!t.スタッフMTG||!t.オーナーMTG);
+  const col=(ttl,icon,items)=>`
+    <div class="tbc">
+      <div class="tbc-hd"><div class="tbc-ttl">${icon} ${ttl} <span class="tbc-ct">${items.length}</span></div></div>
+      ${items.map(t=>`
+        <div class="tc" onclick="filterSV('${t.sv}');showView('stores',document.getElementById('nav-stores'))">
+          <div class="tc-ttl">${t.施策||"（施策未入力）"}</div>
+          <div class="tc-meta">
+            <span class="ttag" style="background:${svc(t.sv)}22;color:${svc(t.sv)}">${t.store}</span>
+            <span class="ttag" style="background:var(--sur2);color:var(--ink3)">${t.sv}</span>
+            ${t.スタッフMTG?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">スタッフ✓</span>':""}
+            ${t.オーナーMTG?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">オーナー✓</span>':""}
+          </div>
+        </div>`).join("")}
+    </div>`;
+  el.innerHTML=`<div class="tbd">${col("施策あり","📋",has)+col("MTG完了","✅",done)+col("MTG未完","🔔",need)}</div>`;
+}
+
+// ─ SV TABLE ─
+function renderSVTable(){
+  const el=document.getElementById("v-sv");if(!el)return;
+  const svs=[...new Set(stores.map(s=>s.sv))].sort();
+  const rows=svs.map(sv=>{
+    const d=stores.filter(s=>s.sv===sv);
+    const tgt=d.reduce((a,s)=>a+(s.売上目標||0),0);
+    const act=d.reduce((a,s)=>a+(s.実績売上||0),0);
+    const mk=d.reduce((a,s)=>a+(s.見込み売上||0),0);
+    const p=tgt?Math.round(act/tgt*100):0;
+    const mp=tgt?Math.round(mk/tgt*100):0;
+    const ok=d.filter(s=>(s.達成率||0)>=100).length;
+    const sva=d.reduce((a,s)=>a+(s.SV売上実績||0),0);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:${svc(sv)};flex-shrink:0"></div><strong>${sv}</strong></div></td>
+      <td class="num">${d.length}店</td>
+      <td class="num">¥${fm(act)} / ¥${fm(tgt)}</td>
+      <td class="num" style="color:${pcc(p)};font-weight:700">${p}%</td>
+      <td class="num" style="color:${pcc(mp)};font-weight:700">${mp}%</td>
+      <td class="num">${ok} / ${d.length}</td>
+      <td class="num">¥${fm(sva)}</td>
+    </tr>`;
+  });
+  const T=stores.reduce((a,s)=>a+(s.売上目標||0),0),A=stores.reduce((a,s)=>a+(s.実績売上||0),0),MK=stores.reduce((a,s)=>a+(s.見込み売上||0),0);
+  const P=T?Math.round(A/T*100):0,MP=T?Math.round(MK/T*100):0;
+  el.innerHTML=`<table class="svt">
+    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>SV売上実績</th></tr></thead>
+    <tbody>${rows.join("")}
+    <tr style="font-weight:700;background:var(--sur2)">
+      <td>合計</td><td class="num">${stores.length}店</td>
+      <td class="num">¥${fm(A)} / ¥${fm(T)}</td>
+      <td class="num" style="color:${pcc(P)};font-weight:700">${P}%</td>
+      <td class="num" style="color:${pcc(MP)};font-weight:700">${MP}%</td>
+      <td class="num">${stores.filter(s=>(s.達成率||0)>=100).length} / ${stores.length}</td>
+      <td class="num">¥${fm(stores.reduce((a,s)=>a+(s.SV売上実績||0),0))}</td>
+    </tr></tbody>
+  </table>`;
+}
+
+// ─ INLINE SAVE ─
+async function autoSave(name,field,value){
+  let t=tasks.find(t=>t.store===name);
+  if(!t){t={sv:stores.find(s=>s.name===name)?.sv||"",store:name,施策:"",次回予約特典:"",スタッフMTG:false,オーナーMTG:false,未実行タスク:""};tasks.push(t);}
+  t[field]=value;
+  const id=name.replace(/[^\w]/g,"_");
+  const el=document.getElementById("tf-"+(field==="施策"?"shisku":field==="次回予約特典"?"yoyaku":"x")+"-"+id);
+  if(el)el.className=el.className.replace(" has-val","")+(value?" has-val":"");
+  try{await postTask(name,{[field]:value});}catch(e){console.warn("save failed",e);}
+  renderSum();
+}
+
+async function toggleMTG(name,field,id){
+  let t=tasks.find(t=>t.store===name);
+  if(!t){t={sv:stores.find(s=>s.name===name)?.sv||"",store:name,施策:"",次回予約特典:"",スタッフMTG:false,オーナーMTG:false,未実行タスク:""};tasks.push(t);}
+  const fkey=field==="スタッフMTG"?"スタッフMTG":"オーナーMTG";
+  t[fkey]=!t[fkey];
+  const eid=field==="スタッフMTG"?"chk-smtg-"+id:"chk-omtg-"+id;
+  const chkEl=document.getElementById(eid);
+  if(chkEl){
+    chkEl.className="chk-item"+(t[fkey]?" checked":"");
+    chkEl.querySelector(".chk-box").innerHTML=t[fkey]?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':"";
+    chkEl.querySelector(".chk-lbl").className="chk-lbl"+(t[fkey]?" ":"");
+  }
+  try{await postTask(name,{[fkey]:t[fkey]});}catch(e){console.warn("save failed",e);}
+  renderSum();renderTasks();
+}
+
+async function postTask(store,taskData){
+  if(!API_URL)return;
+  const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"updateTask",store,task:taskData})});
+  const j=await res.json();
+  if(!j.ok&&j.error)throw new Error(j.error);
+}
+
+// ─ NAV ─
+function showView(name,btn){
+  ["v-stores","v-mikomi","v-tasks","v-sv"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display=id===`v-${name}`?"":"none";
+  });
+  document.querySelectorAll(".sb-btn").forEach(b=>b.classList.remove("on"));
+  if(btn)btn.classList.add("on");
+  const hasToggle=["stores"].includes(name);
+  document.getElementById("vtog").style.display=hasToggle?"":"none";
+  const ttl={stores:"加盟店一覧",mikomi:"見込み進捗",tasks:"タスクボード",sv:"SV別集計"};
+  document.getElementById("pg-title").textContent=ttl[name]||name;
+  curView=name;
+}
+
+function setMode(m,btn){
+  mode=m;
+  document.querySelectorAll(".vtb").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  render();
+}
+
+function filterSV(sv){
+  showView("stores",document.getElementById("nav-stores"));
+  const el=document.getElementById("f-sv");if(el)el.value=sv;
+  renderCards();
+}
+</script>
+</body>
+</html>
