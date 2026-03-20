@@ -785,7 +785,6 @@ function renderSVTable(){
     const royalMk=d.reduce((a,s)=>a+(s.見込みロイヤリティ||0),0);
     const royalPct=royalTgt?Math.round(royal/royalTgt*100):0;
     const royalMkPct=royalTgt?Math.round(royalMk/royalTgt*100):0;
-    const svaMk=d.reduce((a,s)=>a+(s.見込みSV売上||s.SV売上実績||0),0);
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:${svc(sv)};flex-shrink:0"></div><strong>${sv}</strong></div></td>
       <td class="num">${d.length}店</td>
@@ -795,7 +794,6 @@ function renderSVTable(){
       <td class="num">${ok} / ${d.length}</td>
       <td class="num"><div>¥${fm(royal)}<span style="font-size:11px;color:${pcc(royalPct)};font-weight:700;margin-left:5px">${royalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(royalTgt)}</div></td>
       <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(royalMkPct)}">¥${fm(royalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(royalMkPct)}">${royalMkPct}%</div><div style="font-size:10px;color:var(--ink3)">目標比</div></td>
-      <td class="num"><span style="color:var(--acc);font-weight:700">¥${fm(svaMk)}</span></td>
     </tr>`;
   });
   const T=stores.reduce((a,s)=>a+(s.売上目標||0),0),A=stores.reduce((a,s)=>a+(s.実績売上||0),0),MK=stores.reduce((a,s)=>a+(s.見込み売上||0),0);
@@ -806,7 +804,7 @@ function renderSVTable(){
   const totRoyalPct=totRoyalTgt?Math.round(totRoyal/totRoyalTgt*100):0;
   const totRoyalMkPct=totRoyalTgt?Math.round(totRoyalMk/totRoyalTgt*100):0;
   el.innerHTML=`<table class="svt">
-    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ実績（達成率）</th><th style="background:var(--acc2);color:var(--acc)">ロイヤリティ見込み（目標比）</th><th>SV売上 <span style="color:var(--acc)">見込み</span></th></tr></thead>
+    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ実績（達成率）</th><th style="background:var(--acc2);color:var(--acc)">ロイヤリティ見込み（目標比）</th></tr></thead>
     <tbody>${rows.join("")}
     <tr style="font-weight:700;background:var(--sur2)">
       <td>合計</td><td class="num">${stores.length}店</td>
@@ -816,7 +814,6 @@ function renderSVTable(){
       <td class="num">${stores.filter(s=>(s.達成率||0)>=100).length} / ${stores.length}</td>
       <td class="num"><div>¥${fm(totRoyal)}<span style="font-size:11px;color:${pcc(totRoyalPct)};font-weight:700;margin-left:5px">${totRoyalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(totRoyalTgt)}</div></td>
       <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(totRoyalMkPct)}">¥${fm(totRoyalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(totRoyalMkPct)}">${totRoyalMkPct}%</div></td>
-      <td class="num"><span style="color:var(--acc);font-weight:700">¥${fm(stores.reduce((a,s)=>a+(s.見込みSV売上||s.SV売上実績||0),0))}</span></td>
     </tr></tbody>
   </table>`;
 }
