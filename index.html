@@ -555,7 +555,7 @@ function storeCard(s,i){
     <div class="prog"><div class="prog-f" style="width:${Math.min(p,100)}%;background:${pc}"></div></div>
     <div class="prog-row"><span class="prog-p" style="color:${pc}">${p}%</span><span class="prog-d">客数${vp!=null?vp+"%":"—"} / SV売上¥${fk(s.SV売上実績)}</span></div>
     <div class="kpi-row" style="margin-top:8px">
-      ${(()=>{const rp=s.ロイヤリティ目標>0?Math.round((s.ロイヤリティ実績||0)/s.ロイヤリティ目標*100):0;const rmp=s.ロイヤリティ目標>0&&s.見込みロイヤリティ?Math.round(s.見込みロイヤリティ/s.ロイヤリティ目標*100):null;return `<div class="ki"><div class="ki-l">ロイヤリティ</div><div class="ki-v" style="font-size:13px;color:${pcc(rp)}">¥${fk(s.ロイヤリティ実績)}<span style="font-size:10px;margin-left:3px">${rp}%</span></div><div class="ki-s">目標 ¥${fk(s.ロイヤリティ目標)}</div>${rmp!==null?`<div style="font-size:10.5px;color:#2563eb;font-weight:700;margin-top:3px;background:#eff6ff;border-radius:3px;padding:1px 5px">見込 ¥${fk(s.見込みロイヤリティ)} <span style="color:${pcc(rmp)}">${rmp}%</span></div>`:"未入力"}</div>`;})()}
+      <div class="ki"><div class="ki-l">ロイヤリティ</div><div class="ki-v" style="font-size:14px">¥${fk(s.ロイヤリティ実績)}</div><div class="ki-s">目標 ¥${fk(s.ロイヤリティ目標)}</div></div>
       <div class="ki"><div class="ki-l">回数券売上</div><div class="ki-v" style="font-size:14px">¥${fk(s.回数券売上実績)}</div><div class="ki-s">目標 ¥${fk(s.回数券売上目標)}</div></div>
       <div class="ki"><div class="ki-l">SV売上</div><div class="ki-v" style="font-size:14px">¥${fk(s.SV売上実績)}</div><div class="ki-s">目標 ¥${fk(s.SV売上目標)}</div></div>
     </div>
@@ -564,8 +564,7 @@ function storeCard(s,i){
       <div class="mikomi-hd">📈 月末見込み</div>
       <div class="mikomi-row">
         <div><span class="mikomi-main" style="color:${mp}">¥${fk(s.見込み売上)}</span><span class="mikomi-pct" style="color:${mp}">${s.見込み達成率}%</span></div>
-        <div class="mikomi-sub">見込み客数 ${s.見込み総客数||"—"}人 / 新規 ${s.見込み新規||"—"}人 / 再来 ${s.見込み再来||"—"}人</div>
-        ${(()=>{const rmp=s.ロイヤリティ目標>0&&s.見込みロイヤリティ?Math.round(s.見込みロイヤリティ/s.ロイヤリティ目標*100):null;return `<div style="margin-top:5px;padding:4px 7px;background:linear-gradient(135deg,#eff6ff,#faf5ff);border:1px solid #bfdbfe;border-radius:4px;display:flex;align-items:center;gap:8px"><span style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.05em">💰 ロイヤリティ見込</span><span style="font-family:'Outfit',sans-serif;font-size:13px;font-weight:800;color:${rmp!==null?pcc(rmp):"var(--ink3)"}">¥${fk(s.見込みロイヤリティ)}</span>${rmp!==null?`<span style="font-size:11px;font-weight:700;color:${pcc(rmp)}">${rmp}%</span><span style="font-size:10px;color:var(--ink3)">目標比</span>`:"<span style='font-size:10px;color:var(--ink3)'>目標 ¥"+fk(s.ロイヤリティ目標)+"</span>"}</div>`;})()}
+        <div class="mikomi-sub">見込み客数 ${s.見込み総客数||"—"}人 / 新規 ${s.見込み新規||"—"}人 / 再来 ${s.見込み再来||"—"}人 / ロイヤリティ ¥${fk(s.見込みロイヤリティ)}</div>
       </div>
       <div class="mikomi-bar"><div class="mikomi-bar-f" style="width:${Math.min(s.見込み達成率||0,100)}%;background:${mp}"></div></div>
     </div>`:""}
@@ -688,7 +687,6 @@ function renderMikomi(){
       const mpc=pcc(mp);
       const diff=mp-(s.達成率||0);
       const arrow=diff>0?`<span class="arr-up">▲${diff.toFixed(1)}</span>`:`<span class="arr-dn">▼${Math.abs(diff).toFixed(1)}</span>`;
-      const royMk=s.見込みロイヤリティ||0;const royTgt=s.ロイヤリティ目標||0;const royPct=royTgt>0&&royMk?Math.round(royMk/royTgt*100):null;
       return `<tr>
         <td><div class="smt-nm"><div class="smt-dot" style="background:${svc(s.sv)}"></div>${s.name}</div></td>
         <td>${s.sv}</td>
@@ -696,8 +694,6 @@ function renderMikomi(){
         <td class="pct-cell" style="color:${pcc(s.達成率||0)}">${s.達成率||"—"}%</td>
         <td class="num">¥${fk(s.見込み売上)}</td>
         <td class="pct-cell" style="color:${mpc}">${mp||"—"}%</td>
-        <td class="num" style="background:var(--acc2)"><span style="font-weight:700;color:${royPct!==null?pcc(royPct):"var(--ink3)"}">¥${fk(royMk)}</span>${royPct!==null?`<br><span style="font-size:10.5px;font-weight:700;color:${pcc(royPct)}">${royPct}%</span>`:""}
-        </td>
         <td class="num">${s.見込み総客数||"—"}人</td>
         <td class="num">${s.見込み客単価?Math.round(s.見込み客単価).toLocaleString():"—"}円</td>
         <td>${arrow}</td>
@@ -718,7 +714,7 @@ function renderMikomi(){
         <table class="smt">
           <thead><tr>
             <th>店舗名</th><th>SV</th><th>売上実績</th><th>実績率</th>
-            <th>見込み売上</th><th>見込み率</th><th style="color:var(--acc)">ロイヤリティ見込み</th><th>見込み客数</th><th>見込み単価</th><th>実績→見込み</th>
+            <th>見込み売上</th><th>見込み率</th><th>見込み客数</th><th>見込み単価</th><th>実績→見込み</th>
           </tr></thead>
           <tbody>${tblRows}</tbody>
         </table>
@@ -734,12 +730,10 @@ function renderMikomi(){
       const mp=s.見込み達成率||0;const mpc=pcc(mp);
       const diff=mp-(s.達成率||0);
       const arrow=diff>0?`<span class="arr-up">▲${diff.toFixed(1)}</span>`:`<span class="arr-dn">▼${Math.abs(diff).toFixed(1)}</span>`;
-      const royMk2=s.見込みロイヤリティ||0;const royTgt2=s.ロイヤリティ目標||0;const royPct2=royTgt2>0&&royMk2?Math.round(royMk2/royTgt2*100):null;
       return `<tr><td><div class="smt-nm"><div class="smt-dot" style="background:${svc(s.sv)}"></div>${s.name}</div></td>
         <td>${s.sv}</td><td class="num">¥${fk(s.実績売上)}</td>
         <td class="pct-cell" style="color:${pcc(s.達成率||0)}">${s.達成率||"—"}%</td>
         <td class="num">¥${fk(s.見込み売上)}</td><td class="pct-cell" style="color:${mpc}">${mp||"—"}%</td>
-        <td class="num" style="background:var(--acc2)"><span style="font-weight:700;color:${royPct2!==null?pcc(royPct2):"var(--ink3)"}">¥${fk(royMk2)}</span>${royPct2!==null?`<br><span style="font-size:10.5px;font-weight:700;color:${pcc(royPct2)}">${royPct2}%</span>`:""}</td>
         <td class="num">${s.見込み総客数||"—"}人</td><td class="num">${s.見込み客単価?Math.round(s.見込み客単価).toLocaleString():"—"}円</td>
         <td>${arrow}</td></tr>`;
     }).join("");
@@ -789,6 +783,8 @@ function renderSVTable(){
     const royal=d.reduce((a,s)=>a+(s.ロイヤリティ実績||0),0);
     const royalTgt=d.reduce((a,s)=>a+(s.ロイヤリティ目標||0),0);
     const royalMk=d.reduce((a,s)=>a+(s.見込みロイヤリティ||0),0);
+    const royalPct=royalTgt?Math.round(royal/royalTgt*100):0;
+    const royalMkPct=royalTgt?Math.round(royalMk/royalTgt*100):0;
     const svaMk=d.reduce((a,s)=>a+(s.見込みSV売上||s.SV売上実績||0),0);
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:${svc(sv)};flex-shrink:0"></div><strong>${sv}</strong></div></td>
@@ -797,14 +793,20 @@ function renderSVTable(){
       <td class="num" style="color:${pcc(p)};font-weight:700">${p}%</td>
       <td class="num" style="color:${pcc(mp)};font-weight:700">${mp}%</td>
       <td class="num">${ok} / ${d.length}</td>
-      <td class="num">¥${fm(royalMk)} / ¥${fm(royalTgt)}</td>
+      <td class="num"><div>¥${fm(royal)}<span style="font-size:11px;color:${pcc(royalPct)};font-weight:700;margin-left:5px">${royalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(royalTgt)}</div></td>
+      <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(royalMkPct)}">¥${fm(royalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(royalMkPct)}">${royalMkPct}%</div><div style="font-size:10px;color:var(--ink3)">目標比</div></td>
       <td class="num"><span style="color:var(--acc);font-weight:700">¥${fm(svaMk)}</span></td>
     </tr>`;
   });
   const T=stores.reduce((a,s)=>a+(s.売上目標||0),0),A=stores.reduce((a,s)=>a+(s.実績売上||0),0),MK=stores.reduce((a,s)=>a+(s.見込み売上||0),0);
   const P=T?Math.round(A/T*100):0,MP=T?Math.round(MK/T*100):0;
+  const totRoyal=stores.reduce((a,s)=>a+(s.ロイヤリティ実績||0),0);
+  const totRoyalTgt=stores.reduce((a,s)=>a+(s.ロイヤリティ目標||0),0);
+  const totRoyalMk=stores.reduce((a,s)=>a+(s.見込みロイヤリティ||0),0);
+  const totRoyalPct=totRoyalTgt?Math.round(totRoyal/totRoyalTgt*100):0;
+  const totRoyalMkPct=totRoyalTgt?Math.round(totRoyalMk/totRoyalTgt*100):0;
   el.innerHTML=`<table class="svt">
-    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ <span style="color:var(--acc)">見込み</span> / 目標</th><th>SV売上 <span style="color:var(--acc)">見込み</span></th></tr></thead>
+    <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ実績（達成率）</th><th style="background:var(--acc2);color:var(--acc)">ロイヤリティ見込み（目標比）</th><th>SV売上 <span style="color:var(--acc)">見込み</span></th></tr></thead>
     <tbody>${rows.join("")}
     <tr style="font-weight:700;background:var(--sur2)">
       <td>合計</td><td class="num">${stores.length}店</td>
@@ -812,7 +814,8 @@ function renderSVTable(){
       <td class="num" style="color:${pcc(P)};font-weight:700">${P}%</td>
       <td class="num" style="color:${pcc(MP)};font-weight:700">${MP}%</td>
       <td class="num">${stores.filter(s=>(s.達成率||0)>=100).length} / ${stores.length}</td>
-      <td class="num"><span style="color:var(--acc);font-weight:700">¥${fm(stores.reduce((a,s)=>a+(s.見込みロイヤリティ||0),0))}</span> / ¥${fm(stores.reduce((a,s)=>a+(s.ロイヤリティ目標||0),0))}</td>
+      <td class="num"><div>¥${fm(totRoyal)}<span style="font-size:11px;color:${pcc(totRoyalPct)};font-weight:700;margin-left:5px">${totRoyalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(totRoyalTgt)}</div></td>
+      <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(totRoyalMkPct)}">¥${fm(totRoyalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(totRoyalMkPct)}">${totRoyalMkPct}%</div></td>
       <td class="num"><span style="color:var(--acc);font-weight:700">¥${fm(stores.reduce((a,s)=>a+(s.見込みSV売上||s.SV売上実績||0),0))}</span></td>
     </tr></tbody>
   </table>`;
