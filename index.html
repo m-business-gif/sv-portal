@@ -874,60 +874,125 @@ function renderTasks(){
 
 // ─ タスクモーダル ─
 let _editRow=0,_editStore="";
+let _taskRowCount=0;
+
+function _taskRowHTML(idx){
+  const catOpts=TASK_CATS.map(v=>`<option value="${v}">${v}</option>`).join("");
+  const priOpts=TASK_PRI.map(v=>`<option value="${v}"${v==="中"?" selected":""}>${v}</option>`).join("");
+  const stsOpts=TASK_STATUS.map(v=>`<option value="${v}">${v}</option>`).join("");
+  return `<div class="multi-task-row" id="mtr-${idx}" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px;position:relative">
+    ${idx>0?`<button onclick="removeTaskRow(${idx})" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--ink3);font-size:14px">✕</button>`:""}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="form-field">
+        <label class="form-label">カテゴリ</label>
+        <select class="form-inp" id="mtr-cat-${idx}">${catOpts}</select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">優先度</label>
+        <select class="form-inp" id="mtr-pri-${idx}">${priOpts}</select>
+      </div>
+    </div>
+    <div class="form-field" style="margin-bottom:8px">
+      <label class="form-label">タスク名 *</label>
+      <input class="form-inp full" id="mtr-task-${idx}" placeholder="タスク内容を入力">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="form-field">
+        <label class="form-label">ステータス</label>
+        <select class="form-inp" id="mtr-sts-${idx}">${stsOpts}</select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">メモ</label>
+        <input class="form-inp" id="mtr-memo-${idx}" placeholder="任意">
+      </div>
+    </div>
+  </div>`;
+}
+
+function addTaskRow(){
+  _taskRowCount++;
+  const container=document.getElementById("multi-task-container");
+  if(container){container.insertAdjacentHTML("beforeend",_taskRowHTML(_taskRowCount));}
+}
+function removeTaskRow(idx){
+  const el=document.getElementById("mtr-"+idx);if(el)el.remove();
+}
+
 function openTaskModal(storeName,row){
-  _editRow=row;_editStore=storeName;
+  _editRow=row;_editStore=storeName;_taskRowCount=0;
   const t=row>0?tasks.find(t=>t.row===row):null;
   const storeOpts=stores.map(s=>`<option value="${s.name}"${(t?t.store:storeName)===s.name?" selected":""}>${s.name}</option>`).join("");
-  const catOpts=TASK_CATS.map(v=>`<option value="${v}"${t&&t.category===v?" selected":""}>${v}</option>`).join("");
-  const stsOpts=TASK_STATUS.map(v=>`<option value="${v}"${(t?t.status:"")==v?" selected":""}>${v}</option>`).join("");
-  const priOpts=TASK_PRI.map(v=>`<option value="${v}"${(t?t.priority:"中")==v?" selected":""}>${v}</option>`).join("");
   const sv=t?t.sv:(stores.find(s=>s.name===storeName)?.sv||"");
+
+  let bodyHTML="";
+  if(row>0){
+    // 編集モード：1件
+    const catOpts=TASK_CATS.map(v=>`<option value="${v}"${t&&t.category===v?" selected":""}>${v}</option>`).join("");
+    const stsOpts=TASK_STATUS.map(v=>`<option value="${v}"${(t?t.status:"")==v?" selected":""}>${v}</option>`).join("");
+    const priOpts=TASK_PRI.map(v=>`<option value="${v}"${(t?t.priority:"中")==v?" selected":""}>${v}</option>`).join("");
+    bodyHTML=`
+      <div class="modal-row">
+        <div class="form-field">
+          <label class="form-label">店舗名 *</label>
+          <select class="form-inp" id="m-store" onchange="autoFillSV()">${storeOpts}</select>
+        </div>
+        <div class="form-field">
+          <label class="form-label">担当SV</label>
+          <input class="form-inp" id="m-sv" value="${sv}" placeholder="自動入力">
+        </div>
+      </div>
+      <div class="modal-row">
+        <div class="form-field">
+          <label class="form-label">カテゴリ</label>
+          <select class="form-inp" id="m-cat">${catOpts}</select>
+        </div>
+        <div class="form-field">
+          <label class="form-label">優先度</label>
+          <select class="form-inp" id="m-pri">${priOpts}</select>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">タスク名 *</label>
+        <input class="form-inp full" id="m-task" value="${t?t.taskName.replace(/"/g,"&quot;"):""}" placeholder="タスク内容を入力">
+      </div>
+      <div class="modal-row">
+        <div class="form-field">
+          <label class="form-label">ステータス</label>
+          <select class="form-inp" id="m-sts">${stsOpts}</select>
+        </div>
+        <div class="form-field">
+          <label class="form-label">完了日</label>
+          <input type="date" class="form-inp" id="m-done" value="${t?t.doneDate:""}">
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">メモ</label>
+        <textarea class="form-inp full form-textarea" id="m-memo">${t?t.memo:""}</textarea>
+      </div>`;
+  } else {
+    // 追加モード：複数件
+    bodyHTML=`
+      <div class="modal-row" style="margin-bottom:12px">
+        <div class="form-field">
+          <label class="form-label">店舗名 *</label>
+          <select class="form-inp" id="m-store" onchange="autoFillSV()">${storeOpts}</select>
+        </div>
+        <div class="form-field">
+          <label class="form-label">担当SV</label>
+          <input class="form-inp" id="m-sv" value="${sv}" placeholder="自動入力">
+        </div>
+      </div>
+      <div id="multi-task-container">${_taskRowHTML(0)}</div>
+      <button onclick="addTaskRow()" style="width:100%;padding:8px;border:1.5px dashed var(--bdr);border-radius:8px;background:none;cursor:pointer;color:var(--acc);font-size:13px;font-weight:600;margin-top:4px">＋ タスクをもう1件追加</button>`;
+  }
+
   const html=`<div class="modal-overlay" id="task-modal" onclick="if(event.target===this)closeModal()">
-    <div class="modal-box">
+    <div class="modal-box" style="max-width:560px">
       <div class="modal-head">
-        <div class="modal-ttl">${row>0?"タスクを編集":"新規タスク"}</div>
+        <div class="modal-ttl">${row>0?"タスクを編集":"タスクを追加"}</div>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
-      <div class="modal-body">
-        <div class="modal-row">
-          <div class="form-field">
-            <label class="form-label">店舗名 *</label>
-            <select class="form-inp" id="m-store" onchange="autoFillSV()">${storeOpts}</select>
-          </div>
-          <div class="form-field">
-            <label class="form-label">担当SV</label>
-            <input class="form-inp" id="m-sv" value="${sv}" placeholder="自動入力">
-          </div>
-        </div>
-        <div class="modal-row">
-          <div class="form-field">
-            <label class="form-label">カテゴリ</label>
-            <select class="form-inp" id="m-cat">${catOpts}</select>
-          </div>
-          <div class="form-field">
-            <label class="form-label">優先度</label>
-            <select class="form-inp" id="m-pri">${priOpts}</select>
-          </div>
-        </div>
-        <div class="form-field">
-          <label class="form-label">タスク名 *</label>
-          <input class="form-inp full" id="m-task" value="${t?t.taskName.replace(/"/g,"&quot;"):""}" placeholder="タスク内容を入力">
-        </div>
-        <div class="modal-row">
-          <div class="form-field">
-            <label class="form-label">ステータス</label>
-            <select class="form-inp" id="m-sts">${stsOpts}</select>
-          </div>
-          <div class="form-field">
-            <label class="form-label">完了日</label>
-            <input type="date" class="form-inp" id="m-done" value="${t?t.doneDate:""}">
-          </div>
-        </div>
-        <div class="form-field">
-          <label class="form-label">メモ</label>
-          <textarea class="form-inp full form-textarea" id="m-memo">${t?t.memo:""}</textarea>
-        </div>
-      </div>
+      <div class="modal-body">${bodyHTML}</div>
       <div class="modal-foot">
         <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
         <button class="btn-save" onclick="saveTaskModal()">保存</button>
@@ -944,31 +1009,56 @@ function autoFillSV(){
 }
 async function saveTaskModal(){
   const store=document.getElementById("m-store")?.value||"";
-  const taskName=document.getElementById("m-task")?.value?.trim()||"";
-  if(!store||!taskName){alert("店舗名とタスク名は必須です");return;}
-  const task={
-    store, sv:document.getElementById("m-sv")?.value||"",
-    category:document.getElementById("m-cat")?.value||"",
-    taskName, status:document.getElementById("m-sts")?.value||"未着手",
-    priority:document.getElementById("m-pri")?.value||"中",
-    memo:document.getElementById("m-memo")?.value||"",
-    doneDate:document.getElementById("m-done")?.value||"",
-  };
-  closeModal();
-  try{
-    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"upsertTask",row:_editRow||0,task})});
-    const j=await res.json();
-    if(j.ok){
-      // ローカル更新
-      if(_editRow>0){
-        const idx=tasks.findIndex(t=>t.row===_editRow);
-        if(idx>=0)tasks[idx]={...task,row:_editRow};
-      } else {
-        tasks.push({...task,row:j.row||Date.now()});
-      }
+  const sv=document.getElementById("m-sv")?.value||"";
+  if(!store){alert("店舗名は必須です");return;}
+
+  if(_editRow>0){
+    // 編集モード
+    const taskName=document.getElementById("m-task")?.value?.trim()||"";
+    if(!taskName){alert("タスク名は必須です");return;}
+    const task={
+      store, sv,
+      category:document.getElementById("m-cat")?.value||"",
+      taskName, status:document.getElementById("m-sts")?.value||"未着手",
+      priority:document.getElementById("m-pri")?.value||"中",
+      memo:document.getElementById("m-memo")?.value||"",
+      doneDate:document.getElementById("m-done")?.value||"",
+    };
+    closeModal();
+    try{
+      const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"upsertTask",row:_editRow,task})});
+      const j=await res.json();
+      if(j.ok){const idx=tasks.findIndex(t=>t.row===_editRow);if(idx>=0)tasks[idx]={...task,row:_editRow};renderTasks();renderSum();}
+      else alert("保存失敗: "+(j.error||""));
+    }catch(e){alert("通信エラー: "+e.message);}
+  } else {
+    // 追加モード（複数）
+    const rows=document.querySelectorAll("[id^='mtr-task-']");
+    const taskList=[];
+    for(const el of rows){
+      const idx=el.id.replace("mtr-task-","");
+      const tn=el.value.trim();
+      if(!tn)continue;
+      taskList.push({
+        store, sv,
+        category:document.getElementById("mtr-cat-"+idx)?.value||"",
+        taskName:tn,
+        status:document.getElementById("mtr-sts-"+idx)?.value||"未着手",
+        priority:document.getElementById("mtr-pri-"+idx)?.value||"中",
+        memo:document.getElementById("mtr-memo-"+idx)?.value||"",
+        doneDate:"",
+      });
+    }
+    if(!taskList.length){alert("タスク名を1件以上入力してください");return;}
+    closeModal();
+    try{
+      const results=await Promise.all(taskList.map(task=>
+        fetch(API_URL,{method:"POST",body:JSON.stringify({action:"upsertTask",row:0,task})}).then(r=>r.json())
+      ));
+      results.forEach((j,i)=>{if(j.ok)tasks.push({...taskList[i],row:j.row||Date.now()+i});});
       renderTasks();renderSum();
-    } else {alert("保存失敗: "+(j.error||""));}
-  }catch(e){alert("通信エラー: "+e.message);}
+    }catch(e){alert("通信エラー: "+e.message);}
+  }
 }
 
 async function changeStatus(row,newStatus,sel){
