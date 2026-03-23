@@ -876,12 +876,24 @@ function renderTasks(){
 let _editRow=0,_editStore="";
 let _taskRowCount=0;
 
-function _taskRowHTML(idx){
+function _taskRowHTML(idx,defaultStore,defaultSV){
   const catOpts=TASK_CATS.map(v=>`<option value="${v}">${v}</option>`).join("");
   const priOpts=TASK_PRI.map(v=>`<option value="${v}"${v==="中"?" selected":""}>${v}</option>`).join("");
   const stsOpts=TASK_STATUS.map(v=>`<option value="${v}">${v}</option>`).join("");
+  const storeOpts=stores.map(s=>`<option value="${s.name}"${s.name===defaultStore?" selected":""}>${s.name}</option>`).join("");
+  const svVal=defaultSV||"";
   return `<div class="multi-task-row" id="mtr-${idx}" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:12px;margin-bottom:8px;position:relative">
     ${idx>0?`<button onclick="removeTaskRow(${idx})" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--ink3);font-size:14px">✕</button>`:""}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="form-field">
+        <label class="form-label">店舗名 *</label>
+        <select class="form-inp" id="mtr-store-${idx}" onchange="mtrFillSV(${idx})">${storeOpts}</select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">担当SV</label>
+        <input class="form-inp" id="mtr-sv-${idx}" value="${svVal}" placeholder="自動入力">
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div class="form-field">
         <label class="form-label">カテゴリ</label>
@@ -909,10 +921,19 @@ function _taskRowHTML(idx){
   </div>`;
 }
 
+function mtrFillSV(idx){
+  const sn=document.getElementById("mtr-store-"+idx)?.value;
+  const sv=stores.find(s=>s.name===sn)?.sv||"";
+  const el=document.getElementById("mtr-sv-"+idx);if(el)el.value=sv;
+}
+
 function addTaskRow(){
   _taskRowCount++;
+  // 直前の行の店舗・SVを引き継ぐ
+  const prevStore=document.getElementById("mtr-store-"+(_taskRowCount-1))?.value||"";
+  const prevSV=document.getElementById("mtr-sv-"+(_taskRowCount-1))?.value||"";
   const container=document.getElementById("multi-task-container");
-  if(container){container.insertAdjacentHTML("beforeend",_taskRowHTML(_taskRowCount));}
+  if(container){container.insertAdjacentHTML("beforeend",_taskRowHTML(_taskRowCount,prevStore,prevSV));}
 }
 function removeTaskRow(idx){
   const el=document.getElementById("mtr-"+idx);if(el)el.remove();
@@ -970,19 +991,9 @@ function openTaskModal(storeName,row){
         <textarea class="form-inp full form-textarea" id="m-memo">${t?t.memo:""}</textarea>
       </div>`;
   } else {
-    // 追加モード：複数件
+    // 追加モード：複数件（各行に店舗セレクター）
     bodyHTML=`
-      <div class="modal-row" style="margin-bottom:12px">
-        <div class="form-field">
-          <label class="form-label">店舗名 *</label>
-          <select class="form-inp" id="m-store" onchange="autoFillSV()">${storeOpts}</select>
-        </div>
-        <div class="form-field">
-          <label class="form-label">担当SV</label>
-          <input class="form-inp" id="m-sv" value="${sv}" placeholder="自動入力">
-        </div>
-      </div>
-      <div id="multi-task-container">${_taskRowHTML(0)}</div>
+      <div id="multi-task-container">${_taskRowHTML(0,storeName,sv)}</div>
       <button onclick="addTaskRow()" style="width:100%;padding:8px;border:1.5px dashed var(--bdr);border-radius:8px;background:none;cursor:pointer;color:var(--acc);font-size:13px;font-weight:600;margin-top:4px">＋ タスクをもう1件追加</button>`;
   }
 
@@ -1008,12 +1019,11 @@ function autoFillSV(){
   const el=document.getElementById("m-sv");if(el)el.value=sv;
 }
 async function saveTaskModal(){
-  const store=document.getElementById("m-store")?.value||"";
-  const sv=document.getElementById("m-sv")?.value||"";
-  if(!store){alert("店舗名は必須です");return;}
-
   if(_editRow>0){
     // 編集モード
+    const store=document.getElementById("m-store")?.value||"";
+    const sv=document.getElementById("m-sv")?.value||"";
+    if(!store){alert("店舗名は必須です");return;}
     const taskName=document.getElementById("m-task")?.value?.trim()||"";
     if(!taskName){alert("タスク名は必須です");return;}
     const task={
@@ -1032,15 +1042,18 @@ async function saveTaskModal(){
       else alert("保存失敗: "+(j.error||""));
     }catch(e){alert("通信エラー: "+e.message);}
   } else {
-    // 追加モード（複数）
-    const rows=document.querySelectorAll("[id^='mtr-task-']");
+    // 追加モード（複数）各行から店舗を個別に読む
+    const taskEls=document.querySelectorAll("[id^='mtr-task-']");
     const taskList=[];
-    for(const el of rows){
+    for(const el of taskEls){
       const idx=el.id.replace("mtr-task-","");
       const tn=el.value.trim();
       if(!tn)continue;
+      const store=document.getElementById("mtr-store-"+idx)?.value||"";
+      if(!store)continue;
       taskList.push({
-        store, sv,
+        store,
+        sv:document.getElementById("mtr-sv-"+idx)?.value||"",
         category:document.getElementById("mtr-cat-"+idx)?.value||"",
         taskName:tn,
         status:document.getElementById("mtr-sts-"+idx)?.value||"未着手",
