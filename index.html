@@ -297,6 +297,16 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
+
+/* TASK BOARD PAGE */
+.task-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.ts-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);text-align:center;position:relative;overflow:hidden}
+.ts-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc)}
+.ts-val{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.ts-sub{font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--ink3);margin-top:2px}
+.ts-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;color:var(--ink3);text-transform:uppercase;margin-top:6px}
+.ts-bar{height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;margin-top:8px}
+.ts-bar-f{height:100%;border-radius:2px;background:var(--acc);transition:width .6s}
 </style>
 </head>
 <body>
@@ -530,7 +540,6 @@ function storeCard(s,i){
   const p=s.達成率??0;
   const pc=pcc(p);
   const c=svc(s.sv);
-  const t=tasks.find(t=>t.store===s.name)||{};
   const id="s"+i;
   const mp=pcc(s.見込み達成率||0);
   const vp=s.総客数目標>0?Math.min(Math.round(s.総客数実績/s.総客数目標*100),999):null;
@@ -568,56 +577,6 @@ function storeCard(s,i){
       </div>
       <div class="mikomi-bar"><div class="mikomi-bar-f" style="width:${Math.min(s.見込み達成率||0,100)}%;background:${mp}"></div></div>
     </div>`:""}
-  </div>
-  <div class="c-tasks">
-    <div class="ct-hd"><div class="ct-ttl">タスク・MTG</div></div>
-    <div class="task-field">
-      <div class="tf-label">実行中の施策</div>
-      <textarea class="tf-input ${t.施策?'has-val':''}" id="tf-shisku-${id}" rows="2" placeholder="施策内容を入力..." onchange="autoSave('${s.name.replace(/'/g,"\\'")}','施策',this.value)">${t.施策||""}</textarea>
-    </div>
-    <div class="task-field">
-      <div class="tf-label">次回予約特典</div>
-      <textarea class="tf-input ${t.次回予約特典?'has-val':''}" id="tf-yoyaku-${id}" rows="1" placeholder="特典内容を入力..." onchange="autoSave('${s.name.replace(/'/g,"\\'")}','次回予約特典',this.value)">${t.次回予約特典||""}</textarea>
-    </div>
-    <div class="chk-row">
-      <div class="chk-item ${t.ミニモ導入?'checked':''}" id="chk-minimo-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','ミニモ導入','${id}')">
-        <div class="chk-box">${t.ミニモ導入?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
-        <span class="chk-lbl">ミニモ導入</span>
-      </div>
-      <div class="chk-item ${t.スタッフMTG?'checked':''}" id="chk-smtg-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','スタッフMTG','${id}')">
-        <div class="chk-box">${t.スタッフMTG?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
-        <span class="chk-lbl">スタッフMTG</span>
-      </div>
-      <div class="chk-item ${t.オーナーMTG?'checked':''}" id="chk-omtg-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','オーナーMTG','${id}')">
-        <div class="chk-box">${t.オーナーMTG?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
-        <span class="chk-lbl">オーナーMTG</span>
-      </div>
-    </div>
-    <div class="chk-row-2" style="margin-top:6px">
-      <div class="chk-item ${t.HPBミーティング?'checked':''}" id="chk-hpb-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','HPBミーティング','${id}')">
-        <div class="chk-box">${t.HPBミーティング?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
-        <span class="chk-lbl">HPBミーティング</span>
-      </div>
-      <div class="chk-item ${t.店舗集計分析?'checked':''}" id="chk-bunseki-${id}" onclick="toggleMTG('${s.name.replace(/'/g,"\\'")}','店舗集計分析','${id}')">
-        <div class="chk-box">${t.店舗集計分析?'<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
-        <span class="chk-lbl">店舗集計分析</span>
-      </div>
-    </div>
-    ${t.未実行タスク?`<div style="margin-top:6px;padding:5px 8px;background:var(--amb2);border-radius:4px;font-size:11px;color:var(--amb)">⚠ ${t.未実行タスク}</div>`:""}
-    ${(()=>{
-      const sr=staffRanks.filter(r=>r.store===s.name);
-      if(!sr.length)return "";
-      const matsu=sr.filter(r=>r.rank==="松").length;
-      const take=sr.filter(r=>r.rank==="竹").length;
-      const ume=sr.filter(r=>r.rank==="梅").length;
-      return `<div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-size:10px;color:var(--ink3);font-weight:600">👤 スタッフ</span>
-        ${matsu?`<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">🌲松 ${matsu}人</span>`:""}
-        ${take?`<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">🎋竹 ${take}人</span>`:""}
-        ${ume?`<span style="background:#fce7f3;color:#9d174d;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">🌸梅 ${ume}人</span>`:""}
-        <span style="font-size:10px;color:var(--ink3)">${sr.length}名</span>
-      </div>`;
-    })()}
   </div>
 </div>`;
 }
@@ -743,28 +702,136 @@ function renderMikomi(){
 // ─ TASK BOARD ─
 function renderTasks(){
   const el=document.getElementById("v-tasks");if(!el)return;
-  let d=mode==="mine"?tasks.filter(t=>t.sv===mySV):tasks;
-  const has=d.filter(t=>t.施策);
-  const done=d.filter(t=>t.スタッフMTG&&t.オーナーMTG);
-  const need=d.filter(t=>!t.スタッフMTG||!t.オーナーMTG);
-  const col=(ttl,icon,items)=>`
-    <div class="tbc">
-      <div class="tbc-hd"><div class="tbc-ttl">${icon} ${ttl} <span class="tbc-ct">${items.length}</span></div></div>
-      ${items.map(t=>`
-        <div class="tc" onclick="filterSV('${t.sv}');showView('stores',document.getElementById('nav-stores'))">
-          <div class="tc-ttl">${t.施策||"（施策未入力）"}</div>
-          <div class="tc-meta">
-            <span class="ttag" style="background:${svc(t.sv)}22;color:${svc(t.sv)}">${t.store}</span>
-            <span class="ttag" style="background:var(--sur2);color:var(--ink3)">${t.sv}</span>
-            ${t.ミニモ導入?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">ミニモ✓</span>':""}
-            ${t.スタッフMTG?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">スタッフ✓</span>':""}
-            ${t.オーナーMTG?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">オーナー✓</span>':""}
-            ${t.HPBミーティング?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">HPB✓</span>':""}
-            ${t.店舗集計分析?'<span class="ttag" style="background:var(--grn2);color:var(--grn)">集計✓</span>':""}
-          </div>
-        </div>`).join("")}
-    </div>`;
-  el.innerHTML=`<div class="tbd">${col("施策あり","📋",has)+col("MTG完了","✅",done)+col("MTG未完","🔔",need)}</div>`;
+  // フィルター状態を保持
+  const savedQ=(document.getElementById("tq")||{}).value||"";
+  const savedSV=(document.getElementById("t-sv")||{}).value||"";
+  const savedDone=(document.getElementById("t-done")||{}).value||"";
+  const allStores=mode==="mine"?stores.filter(s=>s.sv===mySV):stores;
+  const getTask=name=>tasks.find(t=>t.store===name)||{};
+  const total=allStores.length;
+  const cnt=field=>allStores.filter(s=>getTask(s.name)[field]).length;
+  const svs=[...new Set(allStores.map(s=>s.sv))].sort();
+
+  // タスクボード用にIDマップを更新
+  window._storeIndexMap={};
+  allStores.forEach((s,i)=>{window._storeIndexMap[s.name]="tk"+i;});
+
+  const chkSvg='<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  const taskCards=allStores.map((s,i)=>{
+    const t=getTask(s.name);
+    const id="tk"+i;
+    const c=svc(s.sv);
+    const p=s.達成率??0;
+    const pc=pcc(p);
+    const doneCount=[t.ミニモ導入,t.スタッフMTG,t.オーナーMTG,t.HPBミーティング,t.店舗集計分析].filter(Boolean).length;
+    const doneColor=doneCount===5?"var(--grn)":doneCount>0?"var(--amb)":"var(--ink3)";
+    const sn=s.name.replace(/'/g,"\\'");
+    return `<div class="card task-card" id="tcard-${id}" data-sv="${s.sv}" data-name="${s.name}" data-done="${doneCount}">
+  <div class="c-head">
+    <div>
+      <div class="c-name"><div class="c-dot" style="background:${c}"></div>${s.name}</div>
+      <div class="c-meta" style="margin-top:4px;display:flex;gap:5px;align-items:center">
+        <span class="sv-tag" style="background:${c}">${s.sv}</span>
+        <span style="font-size:10px;color:${pc};font-weight:700">売上${p}%</span>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:${doneColor}">${doneCount}/5</div>
+      <div style="font-size:10px;font-weight:700;color:${doneColor}">${doneCount===5?"✓ 完了":doneCount>0?"進行中":"未着手"}</div>
+    </div>
+  </div>
+  <div class="c-tasks">
+    <div class="task-field">
+      <div class="tf-label">実行中の施策</div>
+      <textarea class="tf-input ${t.施策?'has-val':''}" id="tf-shisku-${id}" rows="2" placeholder="施策内容を入力..." onchange="autoSave('${sn}','施策',this.value)">${t.施策||""}</textarea>
+    </div>
+    <div class="task-field">
+      <div class="tf-label">次回予約特典</div>
+      <textarea class="tf-input ${t.次回予約特典?'has-val':''}" id="tf-yoyaku-${id}" rows="1" placeholder="特典内容を入力..." onchange="autoSave('${sn}','次回予約特典',this.value)">${t.次回予約特典||""}</textarea>
+    </div>
+    <div class="chk-row">
+      <div class="chk-item ${t.ミニモ導入?'checked':''}" id="chk-minimo-${id}" onclick="toggleMTG('${sn}','ミニモ導入','${id}')">
+        <div class="chk-box">${t.ミニモ導入?chkSvg:''}</div><span class="chk-lbl">ミニモ導入</span>
+      </div>
+      <div class="chk-item ${t.スタッフMTG?'checked':''}" id="chk-smtg-${id}" onclick="toggleMTG('${sn}','スタッフMTG','${id}')">
+        <div class="chk-box">${t.スタッフMTG?chkSvg:''}</div><span class="chk-lbl">スタッフMTG</span>
+      </div>
+      <div class="chk-item ${t.オーナーMTG?'checked':''}" id="chk-omtg-${id}" onclick="toggleMTG('${sn}','オーナーMTG','${id}')">
+        <div class="chk-box">${t.オーナーMTG?chkSvg:''}</div><span class="chk-lbl">オーナーMTG</span>
+      </div>
+    </div>
+    <div class="chk-row-2" style="margin-top:6px">
+      <div class="chk-item ${t.HPBミーティング?'checked':''}" id="chk-hpb-${id}" onclick="toggleMTG('${sn}','HPBミーティング','${id}')">
+        <div class="chk-box">${t.HPBミーティング?chkSvg:''}</div><span class="chk-lbl">HPBミーティング</span>
+      </div>
+      <div class="chk-item ${t.店舗集計分析?'checked':''}" id="chk-bunseki-${id}" onclick="toggleMTG('${sn}','店舗集計分析','${id}')">
+        <div class="chk-box">${t.店舗集計分析?chkSvg:''}</div><span class="chk-lbl">店舗集計分析</span>
+      </div>
+    </div>
+    ${t.未実行タスク?`<div style="margin-top:6px;padding:5px 8px;background:var(--amb2);border-radius:4px;font-size:11px;color:var(--amb)">⚠ ${t.未実行タスク}</div>`:""}
+  </div>
+</div>`;
+  }).join("");
+
+  el.innerHTML=`
+    <div class="task-summary">
+      ${[
+        {label:"ミニモ導入",field:"ミニモ導入"},
+        {label:"スタッフMTG",field:"スタッフMTG"},
+        {label:"オーナーMTG",field:"オーナーMTG"},
+        {label:"HPBミーティング",field:"HPBミーティング"},
+        {label:"店舗集計分析",field:"店舗集計分析"},
+      ].map(({label,field})=>{
+        const n=cnt(field);const pct=total?Math.round(n/total*100):0;
+        return `<div class="ts-card">
+          <div class="ts-val">${n}<span style="font-size:13px;font-weight:600;color:var(--ink3)">/${total}</span></div>
+          <div class="ts-sub">${pct}%</div>
+          <div class="ts-lbl">${label}</div>
+          <div class="ts-bar"><div class="ts-bar-f" style="width:${pct}%;background:${pct===100?"var(--grn)":pct>=60?"var(--acc)":"var(--amb)"}"></div></div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div class="toolbar">
+      <div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="tq" placeholder="店舗名で検索..." oninput="filterTaskCards()">
+      </div>
+      <select class="sel" id="t-sv" onchange="filterTaskCards()">
+        <option value="">全SV</option>
+        ${svs.map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
+      </select>
+      <select class="sel" id="t-done" onchange="filterTaskCards()">
+        <option value="">完了状況：全て</option>
+        <option value="all">全完了（5/5）</option>
+        <option value="partial">一部完了</option>
+        <option value="none">未着手</option>
+      </select>
+    </div>
+    <div class="sg" id="task-grid">${taskCards}</div>`;
+
+  // フィルター状態を復元
+  if(savedQ){const e=document.getElementById("tq");if(e)e.value=savedQ;}
+  if(savedSV){const e=document.getElementById("t-sv");if(e)e.value=savedSV;}
+  if(savedDone){const e=document.getElementById("t-done");if(e)e.value=savedDone;}
+  if(savedQ||savedSV||savedDone)filterTaskCards();
+}
+
+function filterTaskCards(){
+  const q=(document.getElementById("tq")||{}).value||"";
+  const sv=(document.getElementById("t-sv")||{}).value||"";
+  const done=(document.getElementById("t-done")||{}).value||"";
+  document.querySelectorAll(".task-card").forEach(card=>{
+    const name=card.dataset.name;
+    const svVal=card.dataset.sv;
+    const doneCount=parseInt(card.dataset.done)||0;
+    let show=true;
+    if(q&&!name.includes(q))show=false;
+    if(sv&&svVal!==sv)show=false;
+    if(done==="all"&&doneCount<5)show=false;
+    if(done==="partial"&&(doneCount===0||doneCount===5))show=false;
+    if(done==="none"&&doneCount>0)show=false;
+    card.style.display=show?"":"none";
+  });
 }
 
 // ─ SV TABLE ─
