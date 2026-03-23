@@ -61,24 +61,91 @@ function doPost(e) {
   }
 }
 
-// ─ タスクボード初期セットアップ（GASエディタから手動実行） ─
+// ─ タスクボード初期セットアップ ─
 function setupTaskBoard() {
   const ss = SpreadsheetApp.openById(SS_ID);
   let ws = ss.getSheetByName(SHEET_TASK);
   if (!ws) ws = ss.insertSheet(SHEET_TASK);
   ws.clearContents();
-  const header = [["店舗名","担当SV","カテゴリ","タスク名","ステータス","優先度","メモ","完了日"]];
-  ws.getRange(1,1,1,8).setValues(header);
-  ws.getRange(1,1,1,8).setFontWeight("bold");
+  ws.getRange(1,1,1,8).setValues([["店舗名","担当SV","カテゴリ","タスク名","ステータス","優先度","メモ","完了日"]]);
+  ws.getRange(1,1,1,8).setFontWeight("bold").setBackground("#f1f5f9");
   ws.setFrozenRows(1);
-  ws.setColumnWidth(1,120);
-  ws.setColumnWidth(2,80);
-  ws.setColumnWidth(3,100);
-  ws.setColumnWidth(4,200);
-  ws.setColumnWidth(5,80);
-  ws.setColumnWidth(6,60);
-  ws.setColumnWidth(7,200);
-  ws.setColumnWidth(8,90);
+  ws.setColumnWidths(1,8,[120,80,100,220,80,60,200,90]);
+}
+
+// ─ 旧形式→新形式 移行（GASエディタで1回実行） ─
+function migrateTaskBoard() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_TASK);
+  if (!ws) { Logger.log("タスクボードシートが見つかりません"); return; }
+
+  const rows = ws.getDataRange().getValues();
+  const b = v => v === true || String(v).toUpperCase() === "TRUE";
+
+  // 旧形式かどうか判定（A1がSVなら旧形式）
+  if (String(rows[0][0]).trim() !== "SV") {
+    Logger.log("既に新形式です。移行をスキップします。");
+    return;
+  }
+
+  const newRows = [["店舗名","担当SV","カテゴリ","タスク名","ステータス","優先度","メモ","完了日"]];
+
+  // 旧形式列: SV(0), 店舗名(1), 施策(2), 次回予約特典(3),
+  //           ミニモ導入(4), スタッフMTG(5), オーナーMTG(6),
+  //           HPBミーティング(7), 店舗集計分析(8), LINE配信(9),
+  //           回数券POP共有(10), [空](11), 未実行タスク(12)
+  const checkItems = [
+    {col:4, cat:"集客",    name:"ミニモ導入"},
+    {col:5, cat:"MTG",     name:"スタッフMTG"},
+    {col:6, cat:"MTG",     name:"オーナーMTG"},
+    {col:7, cat:"MTG",     name:"HPBミーティング"},
+    {col:8, cat:"数値管理", name:"店舗集計分析"},
+    {col:9, cat:"HP/SNS",  name:"LINE配信"},
+    {col:10,cat:"集客",    name:"回数券POP共有"},
+  ];
+
+  const seen = {};
+  for (let i = 1; i < rows.length; i++) {
+    const sv    = String(rows[i][0] || "").trim();
+    const store = String(rows[i][1] || "").trim();
+    if (!store) continue;
+
+    const key = sv + "|" + store;
+    if (seen[key]) continue; // 重複行をスキップ
+    seen[key] = true;
+
+    const shisku = String(rows[i][2]  || "").trim();
+    const yoyaku = String(rows[i][3]  || "").trim();
+    const misei  = String(rows[i][12] || "").trim();
+
+    // 施策テキスト
+    if (shisku) newRows.push([store, sv, "集客", shisku, "進行中", "中", "", ""]);
+    // 次回予約特典テキスト
+    if (yoyaku) newRows.push([store, sv, "集客", "次回予約特典: " + yoyaku, "完了", "中", yoyaku, ""]);
+    // チェックボックス項目（TRUE=完了、FALSE=未着手）
+    checkItems.forEach(({col, cat, name}) => {
+      const status = b(rows[i][col]) ? "完了" : "未着手";
+      newRows.push([store, sv, cat, name, status, "中", "", ""]);
+    });
+    // 未実行タスク
+    if (misei) newRows.push([store, sv, "その他", misei, "未着手", "高", "", ""]);
+  }
+
+  // シートを新形式で上書き
+  ws.clearContents();
+  if (newRows.length > 0) {
+    ws.getRange(1, 1, newRows.length, 8).setValues(newRows);
+    ws.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#f1f5f9");
+    ws.setFrozenRows(1);
+    ws.setColumnWidths(1, 8, [120, 80, 100, 220, 80, 60, 200, 90]);
+    // ステータス列に色付け
+    for (let r = 2; r <= newRows.length; r++) {
+      const sts = String(newRows[r-1][4] || "");
+      const bg = sts === "完了" ? "#dcfce7" : sts === "進行中" ? "#fef9c3" : "#f8fafc";
+      ws.getRange(r, 5).setBackground(bg);
+    }
+  }
+  Logger.log("移行完了: " + (newRows.length - 1) + "件のタスクを作成しました。");
 }
 
 // ─ タスク取得 ─
