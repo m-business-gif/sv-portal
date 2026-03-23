@@ -991,7 +991,6 @@ async function deleteTask(row,storeName){
 }
 
 // ─ INLINE SAVE (旧互換) ─
-const _saveTimers={};
 async function autoSave(name,field,value){
   let t=tasks.find(t=>t.store===name);
   if(t)t[field]=value;
