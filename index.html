@@ -298,33 +298,60 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:3px}
 
-/* TASK BOARD PAGE */
-.task-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
-.ts-card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);text-align:center;position:relative;overflow:hidden}
-.ts-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc)}
-.ts-val{font-family:'Outfit',sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1}
-.ts-sub{font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;color:var(--ink3);margin-top:2px}
-.ts-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;color:var(--ink3);text-transform:uppercase;margin-top:6px}
-.ts-bar{height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;margin-top:8px}
-.ts-bar-f{height:100%;border-radius:2px;background:var(--acc);transition:width .6s}
-.task-field{margin-bottom:10px}
-.tf-label{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase;margin-bottom:4px}
-.tf-input{width:100%;box-sizing:border-box;border:1.5px solid var(--bdr);border-radius:6px;padding:7px 9px;font-size:12px;font-family:'Noto Sans JP',sans-serif;color:var(--ink1);background:var(--bg);resize:vertical;transition:border-color .15s}
-.tf-input:focus{outline:none;border-color:var(--acc)}
-.tf-input.has-val{border-color:var(--grn);background:rgba(34,197,94,.05)}
-.tf-input.warn-input.has-val{border-color:var(--amb);background:rgba(251,191,36,.08)}
-.chk-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin:8px 0}
-.chk-item{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;border:1.5px solid var(--bdr);cursor:pointer;transition:all .15s;user-select:none}
-.chk-item:hover{border-color:var(--acc);background:var(--acc2)}
-.chk-item.checked{border-color:var(--grn);background:rgba(34,197,94,.08)}
-.chk-box{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--bdr);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
-.chk-item.checked .chk-box{background:var(--grn);border-color:var(--grn)}
-.chk-lbl{font-size:11px;font-weight:600;color:var(--ink2)}
-.chk-item.checked .chk-lbl{color:var(--grn)}
-.save-status{font-size:10px;height:14px;text-align:right;color:var(--ink3);transition:opacity .3s}
-.save-status.saving{color:var(--acc)}
-.save-status.saved{color:var(--grn)}
-.task-summary{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:20px}
+/* TASK BOARD */
+.tb-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.tb-stats{display:flex;gap:8px;flex-wrap:wrap}
+.tb-stat{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid}
+.tb-stat.all{border-color:var(--bdr);color:var(--ink2);background:var(--sur)}
+.tb-stat.todo{border-color:#94a3b8;color:#64748b;background:#f1f5f9}
+.tb-stat.doing{border-color:#f59e0b;color:#d97706;background:#fffbeb}
+.tb-stat.done{border-color:var(--grn);color:var(--grn);background:rgba(34,197,94,.08)}
+.tb-add-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:opacity .15s}
+.tb-add-btn:hover{opacity:.85}
+.store-section{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:14px;overflow:hidden}
+.store-sec-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--sur2);border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none}
+.store-sec-name{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink1)}
+.store-sec-badges{display:flex;gap:6px;align-items:center}
+.store-sec-add{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1.5px solid var(--acc);border-radius:6px;background:var(--acc2);color:var(--acc);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.store-sec-add:hover{background:var(--acc);color:#fff}
+.task-list{padding:0}
+.task-row{display:grid;grid-template-columns:auto 90px 1fr auto 100px 90px 32px;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bdr2);transition:background .12s}
+.task-row:last-child{border-bottom:none}
+.task-row:hover{background:var(--acc2)}
+.pri-badge{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cat-badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:var(--acc2);color:var(--acc);white-space:nowrap}
+.task-name-cell{font-size:12px;font-weight:600;color:var(--ink1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-memo{font-size:11px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-sel{padding:3px 6px;border-radius:6px;border:1.5px solid;font-size:11px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;background:transparent}
+.status-sel.s-todo{border-color:#94a3b8;color:#64748b}
+.status-sel.s-doing{border-color:#f59e0b;color:#d97706}
+.status-sel.s-done{border-color:var(--grn);color:var(--grn)}
+.done-date{font-size:10px;color:var(--ink3);text-align:right}
+.task-edit-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--bdr);border-radius:6px;background:var(--sur);cursor:pointer;color:var(--ink3);transition:all .15s;font-size:13px}
+.task-edit-btn:hover{border-color:var(--acc);color:var(--acc)}
+.task-del-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--bdr);border-radius:6px;background:var(--sur);cursor:pointer;color:var(--ink3);transition:all .15s;font-size:13px}
+.task-del-btn:hover{border-color:#ef4444;color:#ef4444}
+.empty-tasks{padding:16px;text-align:center;font-size:12px;color:var(--ink3)}
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-box{background:var(--sur);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--bdr)}
+.modal-ttl{font-size:15px;font-weight:800;color:var(--ink1)}
+.modal-close{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:none;background:none;font-size:18px;cursor:pointer;color:var(--ink3);border-radius:6px}
+.modal-close:hover{background:var(--bdr2)}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-field{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.05em}
+.form-inp{padding:8px 10px;border:1.5px solid var(--bdr);border-radius:8px;font-size:12px;font-family:'Noto Sans JP',sans-serif;color:var(--ink1);background:var(--bg);transition:border-color .15s}
+.form-inp:focus{outline:none;border-color:var(--acc)}
+.form-inp.full{width:100%;box-sizing:border-box}
+.form-textarea{resize:vertical;min-height:70px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--bdr);display:flex;gap:10px;justify-content:flex-end}
+.btn-cancel{padding:8px 18px;border:1.5px solid var(--bdr);border-radius:8px;background:var(--sur);font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;color:var(--ink2)}
+.btn-save{padding:8px 22px;border:none;border-radius:8px;background:var(--acc);color:#fff;font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer}
+.btn-save:hover{opacity:.85}
+.tb-no-store{padding:40px;text-align:center;color:var(--ink3);font-size:13px}
 </style>
 </head>
 <body>
@@ -723,131 +750,258 @@ function renderMikomi(){
 }
 
 // ─ TASK BOARD ─
-const ALL_CHK=[
-  {field:"ミニモ導入",id:"minimo"},
-  {field:"スタッフMTG",id:"smtg"},
-  {field:"オーナーMTG",id:"omtg"},
-  {field:"HPBミーティング",id:"hpb"},
-  {field:"店舗集計分析",id:"bunseki"},
-  {field:"LINE配信",id:"line"},
-  {field:"回数券POP共有",id:"kaisu"},
-];
+// ─ TASK BOARD (NEW) ─
+const TASK_CATS=["集客","教育","店舗運営","数値管理","MTG","HP/SNS","その他"];
+const TASK_STATUS=["未着手","進行中","完了"];
+const TASK_PRI=["高","中","低"];
+const PRI_COLOR={高:"#ef4444",中:"#f59e0b",低:"#94a3b8"};
+const STS_CLS={未着手:"s-todo",進行中:"s-doing",完了:"s-done"};
 
 function renderTasks(){
   const el=document.getElementById("v-tasks");if(!el)return;
-  const savedQ=(document.getElementById("tq")||{}).value||"";
-  const savedSV=(document.getElementById("t-sv")||{}).value||"";
-  const savedDone=(document.getElementById("t-done")||{}).value||"";
   const allStores=mode==="mine"?stores.filter(s=>s.sv===mySV):stores;
-  const getTask=name=>tasks.find(t=>t.store===name)||{};
-  const total=allStores.length;
-  const cnt=field=>allStores.filter(s=>getTask(s.name)[field]).length;
   const svs=[...new Set(allStores.map(s=>s.sv))].sort();
-  const totalChk=ALL_CHK.length;
+  const cats=[...new Set(tasks.map(t=>t.category).filter(Boolean))].sort();
+  const fq=(document.getElementById("tb-q")||{}).value||"";
+  const fsv=(document.getElementById("tb-sv")||{}).value||"";
+  const fcat=(document.getElementById("tb-cat")||{}).value||"";
+  const fsts=(document.getElementById("tb-sts")||{}).value||"";
+  const fpri=(document.getElementById("tb-pri")||{}).value||"";
 
-  window._storeIndexMap={};
-  allStores.forEach((s,i)=>{window._storeIndexMap[s.name]="tk"+i;});
+  const total=tasks.length;
+  const todo=tasks.filter(t=>t.status==="未着手").length;
+  const doing=tasks.filter(t=>t.status==="進行中").length;
+  const done=tasks.filter(t=>t.status==="完了").length;
 
-  const chkSvg='<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>';
+  // フィルタ適用
+  const visStores=allStores.filter(s=>{
+    if(fsv&&s.sv!==fsv)return false;
+    if(fq&&!s.name.includes(fq))return false;
+    return true;
+  });
 
-  const taskCards=allStores.map((s,i)=>{
-    const t=getTask(s.name);
-    const id="tk"+i;
+  const storeSections=visStores.map(s=>{
+    const storeTasks=tasks.filter(t=>{
+      if(t.store!==s.name)return false;
+      if(fcat&&t.category!==fcat)return false;
+      if(fsts&&t.status!==fsts)return false;
+      if(fpri&&t.priority!==fpri)return false;
+      return true;
+    });
     const c=svc(s.sv);
     const p=s.達成率??0;
-    const pc=pcc(p);
-    const doneCount=ALL_CHK.filter(({field})=>t[field]).length;
-    const doneColor=doneCount===totalChk?"var(--grn)":doneCount>0?"var(--amb)":"var(--ink3)";
-    const sn=s.name.replace(/'/g,"\\'");
-    const chkItems=ALL_CHK.map(({field,id:cid})=>
-      `<div class="chk-item ${t[field]?'checked':''}" id="chk-${cid}-${id}" onclick="toggleMTG('${sn}','${field}','${id}')">
-        <div class="chk-box">${t[field]?chkSvg:''}</div><span class="chk-lbl">${field}</span>
-      </div>`).join("");
-    return `<div class="card task-card" id="tcard-${id}" data-sv="${s.sv}" data-name="${s.name}" data-done="${doneCount}">
-  <div class="c-head">
-    <div>
-      <div class="c-name"><div class="c-dot" style="background:${c}"></div>${s.name}</div>
-      <div class="c-meta" style="margin-top:4px;display:flex;gap:5px;align-items:center">
-        <span class="sv-tag" style="background:${c}">${s.sv}</span>
-        <span style="font-size:10px;color:${pc};font-weight:700">売上${p}%</span>
+    const doneN=storeTasks.filter(t=>t.status==="完了").length;
+    const sn=s.name.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+
+    const taskRows=storeTasks.map(t=>{
+      const priC=PRI_COLOR[t.priority]||"#94a3b8";
+      const stsC=STS_CLS[t.status]||"s-todo";
+      const opts=TASK_STATUS.map(v=>`<option value="${v}" ${t.status===v?"selected":""}>${v}</option>`).join("");
+      const tn=t.taskName.replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      const memo=(t.memo||"").replace(/</g,"&lt;");
+      return `<div class="task-row" data-row="${t.row}">
+        <div class="pri-badge" style="background:${priC}" title="${t.priority}優先度"></div>
+        <span class="cat-badge">${t.category||"—"}</span>
+        <div>
+          <div class="task-name-cell" title="${tn}">${tn}</div>
+          ${memo?`<div class="task-memo">${memo}</div>`:""}
+        </div>
+        <div style="font-size:10px;color:var(--ink3)">${t.doneDate||""}</div>
+        <select class="status-sel ${stsC}" onchange="changeStatus(${t.row},this.value,this)">${opts}</select>
+        <div style="display:flex;gap:4px">
+          <button class="task-edit-btn" onclick="openTaskModal('${sn}',${t.row})" title="編集">✏️</button>
+          <button class="task-del-btn" onclick="deleteTask(${t.row},'${sn}')" title="削除">🗑</button>
+        </div>
+      </div>`;
+    }).join("") || `<div class="empty-tasks">タスクなし</div>`;
+
+    return `<div class="store-section" data-store="${s.name}" data-sv="${s.sv}">
+      <div class="store-sec-head">
+        <div class="store-sec-name">
+          <div style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></div>
+          <span>${s.name}</span>
+          <span class="sv-tag" style="background:${c};font-size:10px">${s.sv}</span>
+          <span style="font-size:10px;color:${pcc(p)};font-weight:700">${p}%</span>
+        </div>
+        <div class="store-sec-badges">
+          <span style="font-size:10px;color:var(--ink3)">${storeTasks.length}件（完了${doneN}）</span>
+          <button class="store-sec-add" onclick="openTaskModal('${sn}',0)">＋ タスク追加</button>
+        </div>
       </div>
-    </div>
-    <div style="text-align:right">
-      <div style="font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;color:${doneColor}">${doneCount}/${totalChk}</div>
-      <div style="font-size:10px;font-weight:700;color:${doneColor}">${doneCount===totalChk?"✓ 完了":doneCount>0?"進行中":"未着手"}</div>
-    </div>
-  </div>
-  <div class="c-tasks">
-    <div class="task-field">
-      <div class="tf-label">📌 実行中の施策</div>
-      <textarea class="tf-input ${t.施策?'has-val':''}" id="tf-shisku-${id}" rows="3" placeholder="今月の施策・取り組みを記入..." oninput="debounceSave('${sn}','施策',this.value,'${id}')">${t.施策||""}</textarea>
-    </div>
-    <div class="task-field">
-      <div class="tf-label">🎁 次回予約特典</div>
-      <textarea class="tf-input ${t.次回予約特典?'has-val':''}" id="tf-yoyaku-${id}" rows="2" placeholder="次回予約特典の内容を記入..." oninput="debounceSave('${sn}','次回予約特典',this.value,'${id}')">${t.次回予約特典||""}</textarea>
-    </div>
-    <div class="tf-label" style="margin-bottom:5px">☑ 実施チェック</div>
-    <div class="chk-grid">${chkItems}</div>
-    <div class="task-field" style="margin-top:8px">
-      <div class="tf-label" style="color:var(--amb)">⚠ 未実行タスク / 申し送り</div>
-      <textarea class="tf-input warn-input ${t.未実行タスク?'has-val':''}" id="tf-misei-${id}" rows="2" placeholder="未完了・次回への申し送りを記入..." oninput="debounceSave('${sn}','未実行タスク',this.value,'${id}')">${t.未実行タスク||""}</textarea>
-    </div>
-    <div class="save-status" id="ss-${id}"></div>
-  </div>
-</div>`;
+      <div class="task-list">${taskRows}</div>
+    </div>`;
   }).join("");
 
   el.innerHTML=`
-    <div class="task-summary">
-      ${ALL_CHK.map(({field})=>{
-        const n=cnt(field);const pct=total?Math.round(n/total*100):0;
-        return `<div class="ts-card">
-          <div class="ts-val">${n}<span style="font-size:11px;font-weight:600;color:var(--ink3)">/${total}</span></div>
-          <div class="ts-sub">${pct}%</div>
-          <div class="ts-lbl">${field}</div>
-          <div class="ts-bar"><div class="ts-bar-f" style="width:${pct}%;background:${pct===100?"var(--grn)":pct>=60?"var(--acc)":"var(--amb)"}"></div></div>
-        </div>`;
-      }).join("")}
-    </div>
-    <div class="toolbar">
-      <div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="tq" placeholder="店舗名で検索..." oninput="filterTaskCards()">
+    <div class="tb-header">
+      <div class="tb-stats">
+        <span class="tb-stat all">全${total}件</span>
+        <span class="tb-stat todo">未着手 ${todo}</span>
+        <span class="tb-stat doing">進行中 ${doing}</span>
+        <span class="tb-stat done">完了 ${done}</span>
       </div>
-      <select class="sel" id="t-sv" onchange="filterTaskCards()">
-        <option value="">全SV</option>
-        ${svs.map(sv=>`<option value="${sv}">${sv}</option>`).join("")}
+      <button class="tb-add-btn" onclick="openTaskModal('',0)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        タスクを追加
+      </button>
+    </div>
+    <div class="toolbar" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      <div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="tb-q" placeholder="店舗名で検索..." oninput="renderTasks()" value="${fq}">
+      </div>
+      <select class="sel" id="tb-sv" onchange="renderTasks()">
+        <option value="">全SV</option>${svs.map(v=>`<option value="${v}"${fsv===v?" selected":""}>${v}</option>`).join("")}
       </select>
-      <select class="sel" id="t-done" onchange="filterTaskCards()">
-        <option value="">完了状況：全て</option>
-        <option value="all">全完了</option>
-        <option value="partial">一部完了</option>
-        <option value="none">未着手</option>
+      <select class="sel" id="tb-cat" onchange="renderTasks()">
+        <option value="">全カテゴリ</option>${TASK_CATS.map(v=>`<option value="${v}"${fcat===v?" selected":""}>${v}</option>`).join("")}
+      </select>
+      <select class="sel" id="tb-sts" onchange="renderTasks()">
+        <option value="">全ステータス</option>${TASK_STATUS.map(v=>`<option value="${v}"${fsts===v?" selected":""}>${v}</option>`).join("")}
+      </select>
+      <select class="sel" id="tb-pri" onchange="renderTasks()">
+        <option value="">全優先度</option>${TASK_PRI.map(v=>`<option value="${v}"${fpri===v?" selected":""}>${v}</option>`).join("")}
       </select>
     </div>
-    <div class="sg" id="task-grid">${taskCards}</div>`;
-
-  if(savedQ){const e=document.getElementById("tq");if(e)e.value=savedQ;}
-  if(savedSV){const e=document.getElementById("t-sv");if(e)e.value=savedSV;}
-  if(savedDone){const e=document.getElementById("t-done");if(e)e.value=savedDone;}
-  if(savedQ||savedSV||savedDone)filterTaskCards();
+    ${storeSections||`<div class="tb-no-store">表示する店舗がありません</div>`}`;
 }
 
-function filterTaskCards(){
-  const q=(document.getElementById("tq")||{}).value||"";
-  const sv=(document.getElementById("t-sv")||{}).value||"";
-  const done=(document.getElementById("t-done")||{}).value||"";
-  document.querySelectorAll(".task-card").forEach(card=>{
-    const name=card.dataset.name;
-    const svVal=card.dataset.sv;
-    const doneCount=parseInt(card.dataset.done)||0;
-    let show=true;
-    if(q&&!name.includes(q))show=false;
-    if(sv&&svVal!==sv)show=false;
-    if(done==="all"&&doneCount<5)show=false;
-    if(done==="partial"&&(doneCount===0||doneCount===5))show=false;
-    if(done==="none"&&doneCount>0)show=false;
-    card.style.display=show?"":"none";
-  });
+// ─ タスクモーダル ─
+let _editRow=0,_editStore="";
+function openTaskModal(storeName,row){
+  _editRow=row;_editStore=storeName;
+  const t=row>0?tasks.find(t=>t.row===row):null;
+  const storeOpts=stores.map(s=>`<option value="${s.name}"${(t?t.store:storeName)===s.name?" selected":""}>${s.name}</option>`).join("");
+  const catOpts=TASK_CATS.map(v=>`<option value="${v}"${t&&t.category===v?" selected":""}>${v}</option>`).join("");
+  const stsOpts=TASK_STATUS.map(v=>`<option value="${v}"${(t?t.status:"")==v?" selected":""}>${v}</option>`).join("");
+  const priOpts=TASK_PRI.map(v=>`<option value="${v}"${(t?t.priority:"中")==v?" selected":""}>${v}</option>`).join("");
+  const sv=t?t.sv:(stores.find(s=>s.name===storeName)?.sv||"");
+  const html=`<div class="modal-overlay" id="task-modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-ttl">${row>0?"タスクを編集":"新規タスク"}</div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <div class="form-field">
+            <label class="form-label">店舗名 *</label>
+            <select class="form-inp" id="m-store" onchange="autoFillSV()">${storeOpts}</select>
+          </div>
+          <div class="form-field">
+            <label class="form-label">担当SV</label>
+            <input class="form-inp" id="m-sv" value="${sv}" placeholder="自動入力">
+          </div>
+        </div>
+        <div class="modal-row">
+          <div class="form-field">
+            <label class="form-label">カテゴリ</label>
+            <select class="form-inp" id="m-cat">${catOpts}</select>
+          </div>
+          <div class="form-field">
+            <label class="form-label">優先度</label>
+            <select class="form-inp" id="m-pri">${priOpts}</select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">タスク名 *</label>
+          <input class="form-inp full" id="m-task" value="${t?t.taskName.replace(/"/g,"&quot;"):""}" placeholder="タスク内容を入力">
+        </div>
+        <div class="modal-row">
+          <div class="form-field">
+            <label class="form-label">ステータス</label>
+            <select class="form-inp" id="m-sts">${stsOpts}</select>
+          </div>
+          <div class="form-field">
+            <label class="form-label">完了日</label>
+            <input type="date" class="form-inp" id="m-done" value="${t?t.doneDate:""}">
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">メモ</label>
+          <textarea class="form-inp full form-textarea" id="m-memo">${t?t.memo:""}</textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+        <button class="btn-save" onclick="saveTaskModal()">保存</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML("beforeend",html);
+}
+function closeModal(){const m=document.getElementById("task-modal");if(m)m.remove();}
+function autoFillSV(){
+  const sn=document.getElementById("m-store")?.value;
+  const sv=stores.find(s=>s.name===sn)?.sv||"";
+  const el=document.getElementById("m-sv");if(el)el.value=sv;
+}
+async function saveTaskModal(){
+  const store=document.getElementById("m-store")?.value||"";
+  const taskName=document.getElementById("m-task")?.value?.trim()||"";
+  if(!store||!taskName){alert("店舗名とタスク名は必須です");return;}
+  const task={
+    store, sv:document.getElementById("m-sv")?.value||"",
+    category:document.getElementById("m-cat")?.value||"",
+    taskName, status:document.getElementById("m-sts")?.value||"未着手",
+    priority:document.getElementById("m-pri")?.value||"中",
+    memo:document.getElementById("m-memo")?.value||"",
+    doneDate:document.getElementById("m-done")?.value||"",
+  };
+  closeModal();
+  try{
+    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"upsertTask",row:_editRow||0,task})});
+    const j=await res.json();
+    if(j.ok){
+      // ローカル更新
+      if(_editRow>0){
+        const idx=tasks.findIndex(t=>t.row===_editRow);
+        if(idx>=0)tasks[idx]={...task,row:_editRow};
+      } else {
+        tasks.push({...task,row:j.row||Date.now()});
+      }
+      renderTasks();renderSum();
+    } else {alert("保存失敗: "+(j.error||""));}
+  }catch(e){alert("通信エラー: "+e.message);}
+}
+
+async function changeStatus(row,newStatus,sel){
+  const t=tasks.find(t=>t.row===row);
+  if(!t)return;
+  const oldStatus=t.status;
+  t.status=newStatus;
+  if(newStatus==="完了")t.doneDate=new Date().toISOString().slice(0,10);
+  else t.doneDate="";
+  sel.className="status-sel "+(STS_CLS[newStatus]||"s-todo");
+  try{
+    await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"upsertTask",row,task:{status:newStatus,doneDate:t.doneDate}})});
+    // 完了日を即時表示更新
+    const rowEl=sel.closest(".task-row");
+    if(rowEl){const dd=rowEl.querySelector("div:nth-child(4)");if(dd)dd.textContent=t.doneDate||"";}
+    renderSum();
+  }catch(e){t.status=oldStatus;sel.value=oldStatus;console.warn("status save failed",e);}
+}
+
+async function deleteTask(row,storeName){
+  if(!confirm("このタスクを削除しますか？"))return;
+  try{
+    await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"deleteTask",row})});
+    tasks=tasks.filter(t=>t.row!==row);
+    renderTasks();renderSum();
+  }catch(e){alert("削除失敗: "+e.message);}
+}
+
+// ─ INLINE SAVE (旧互換) ─
+const _saveTimers={};
+async function autoSave(name,field,value){
+  let t=tasks.find(t=>t.store===name);
+  if(t)t[field]=value;
+  renderSum();
+}
+async function postTask(store,taskData){
+  if(!API_URL)return;
+  const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"upsertTask",row:0,task:{store,...taskData}})});
+  const j=await res.json();
+  if(!j.ok&&j.error)throw new Error(j.error);
 }
 
 // ─ SV TABLE ─
