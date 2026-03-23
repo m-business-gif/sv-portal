@@ -760,49 +760,60 @@ const STS_CLS={未着手:"s-todo",進行中:"s-doing",完了:"s-done"};
 function renderTasks(){
   const el=document.getElementById("v-tasks");if(!el)return;
   const allStores=mode==="mine"?stores.filter(s=>s.sv===mySV):stores;
+  const storeNames=new Set(allStores.map(s=>s.name));
   const svs=[...new Set(allStores.map(s=>s.sv))].sort();
-  const cats=[...new Set(tasks.map(t=>t.category).filter(Boolean))].sort();
   const fq=(document.getElementById("tb-q")||{}).value||"";
   const fsv=(document.getElementById("tb-sv")||{}).value||"";
   const fcat=(document.getElementById("tb-cat")||{}).value||"";
   const fsts=(document.getElementById("tb-sts")||{}).value||"";
   const fpri=(document.getElementById("tb-pri")||{}).value||"";
 
-  const total=tasks.length;
-  const todo=tasks.filter(t=>t.status==="未着手").length;
-  const doing=tasks.filter(t=>t.status==="進行中").length;
-  const done=tasks.filter(t=>t.status==="完了").length;
-
   // フィルタ適用
-  const visStores=allStores.filter(s=>{
-    if(fsv&&s.sv!==fsv)return false;
-    if(fq&&!s.name.includes(fq))return false;
+  let visTasks=tasks.filter(t=>{
+    if(!storeNames.has(t.store))return false;
+    if(fsv&&t.sv!==fsv)return false;
+    if(fq&&!t.store.includes(fq)&&!t.taskName.includes(fq))return false;
+    if(fcat&&t.category!==fcat)return false;
+    if(fsts&&t.status!==fsts)return false;
+    if(fpri&&t.priority!==fpri)return false;
     return true;
   });
 
-  const storeSections=visStores.map(s=>{
-    const storeTasks=tasks.filter(t=>{
-      if(t.store!==s.name)return false;
-      if(fcat&&t.category!==fcat)return false;
-      if(fsts&&t.status!==fsts)return false;
-      if(fpri&&t.priority!==fpri)return false;
-      return true;
-    });
-    const c=svc(s.sv);
-    const p=s.達成率??0;
-    const doneN=storeTasks.filter(t=>t.status==="完了").length;
-    const sn=s.name.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+  const total=visTasks.length;
+  const todo=visTasks.filter(t=>t.status==="未着手").length;
+  const doing=visTasks.filter(t=>t.status==="進行中").length;
+  const done=visTasks.filter(t=>t.status==="完了").length;
 
-    const taskRows=storeTasks.map(t=>{
+  // カテゴリ順
+  const catOrder=TASK_CATS;
+  const usedCats=[...new Set(visTasks.map(t=>t.category||"その他"))].sort((a,b)=>{
+    const ai=catOrder.indexOf(a),bi=catOrder.indexOf(b);
+    return (ai<0?99:ai)-(bi<0?99:bi);
+  });
+
+  const catSections=usedCats.map(cat=>{
+    const catTasks=visTasks.filter(t=>(t.category||"その他")===cat);
+    const doneN=catTasks.filter(t=>t.status==="完了").length;
+    const catColors={集客:"#3b82f6",教育:"#8b5cf6",店舗運営:"#f59e0b",数値管理:"#10b981",MTG:"#ef4444","HP/SNS":"#06b6d4",その他:"#94a3b8"};
+    const cc=catColors[cat]||"#6b7280";
+
+    const taskRows=catTasks.map(t=>{
       const priC=PRI_COLOR[t.priority]||"#94a3b8";
       const stsC=STS_CLS[t.status]||"s-todo";
       const opts=TASK_STATUS.map(v=>`<option value="${v}" ${t.status===v?"selected":""}>${v}</option>`).join("");
       const tn=t.taskName.replace(/</g,"&lt;").replace(/>/g,"&gt;");
       const memo=(t.memo||"").replace(/</g,"&lt;");
+      const sv=t.sv||"";
+      const sn=t.store.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+      const storeInfo=stores.find(s=>s.name===t.store);
+      const pct=storeInfo?storeInfo.達成率??0:0;
       return `<div class="task-row" data-row="${t.row}">
         <div class="pri-badge" style="background:${priC}" title="${t.priority}優先度"></div>
-        <span class="cat-badge">${t.category||"—"}</span>
-        <div>
+        <div style="min-width:90px">
+          <div style="font-size:12px;font-weight:600;color:var(--ink)">${t.store}</div>
+          <div style="font-size:10px;color:var(--ink3)">${sv} <span style="color:${pcc(pct)};font-weight:600">${pct}%</span></div>
+        </div>
+        <div style="flex:1">
           <div class="task-name-cell" title="${tn}">${tn}</div>
           ${memo?`<div class="task-memo">${memo}</div>`:""}
         </div>
@@ -813,20 +824,16 @@ function renderTasks(){
           <button class="task-del-btn" onclick="deleteTask(${t.row},'${sn}')" title="削除">🗑</button>
         </div>
       </div>`;
-    }).join("") || `<div class="empty-tasks">タスクなし</div>`;
+    }).join("");
 
-    return `<div class="store-section" data-store="${s.name}" data-sv="${s.sv}">
+    return `<div class="store-section" data-cat="${cat}">
       <div class="store-sec-head">
         <div class="store-sec-name">
-          <div style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></div>
-          <span>${s.name}</span>
-          <span class="sv-tag" style="background:${c};font-size:10px">${s.sv}</span>
-          <span style="font-size:10px;color:${pcc(p)};font-weight:700">${p}%</span>
+          <div style="width:9px;height:9px;border-radius:50%;background:${cc};flex-shrink:0"></div>
+          <span style="font-size:14px;font-weight:700">${cat}</span>
+          <span style="font-size:11px;color:var(--ink3)">${catTasks.length}件（完了${doneN}）</span>
         </div>
-        <div class="store-sec-badges">
-          <span style="font-size:10px;color:var(--ink3)">${storeTasks.length}件（完了${doneN}）</span>
-          <button class="store-sec-add" onclick="openTaskModal('${sn}',0)">＋ タスク追加</button>
-        </div>
+        <button class="store-sec-add" onclick="openTaskModal('',0)">＋ タスク追加</button>
       </div>
       <div class="task-list">${taskRows}</div>
     </div>`;
@@ -847,7 +854,7 @@ function renderTasks(){
     </div>
     <div class="toolbar" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">
       <div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="tb-q" placeholder="店舗名で検索..." oninput="renderTasks()" value="${fq}">
+        <input type="text" id="tb-q" placeholder="店舗名・タスク名で検索..." oninput="renderTasks()" value="${fq}">
       </div>
       <select class="sel" id="tb-sv" onchange="renderTasks()">
         <option value="">全SV</option>${svs.map(v=>`<option value="${v}"${fsv===v?" selected":""}>${v}</option>`).join("")}
@@ -862,7 +869,7 @@ function renderTasks(){
         <option value="">全優先度</option>${TASK_PRI.map(v=>`<option value="${v}"${fpri===v?" selected":""}>${v}</option>`).join("")}
       </select>
     </div>
-    ${storeSections||`<div class="tb-no-store">表示する店舗がありません</div>`}`;
+    ${catSections||`<div class="tb-no-store">該当するタスクがありません</div>`}`;
 }
 
 // ─ タスクモーダル ─
