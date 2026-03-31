@@ -55,6 +55,14 @@ function doPost(e) {
       deleteStaff(data.store, data.staff);
       return json({ ok: true });
     }
+    if (data.action === "addStore") {
+      addStoreFn(data.sv, data.name, data.ym, data.goals || {});
+      return json({ ok: true });
+    }
+    if (data.action === "updateGoal") {
+      updateGoalFn(data.name, data.ym, data.goals || {});
+      return json({ ok: true });
+    }
     return json({ error: "unknown action" });
   } catch(err) {
     return json({ error: err.toString() });
@@ -435,6 +443,49 @@ function deleteStaff(storeName, staffName) {
   for (let i = rows.length-1; i >= 1; i--) {
     if (String(rows[i][0]||"").trim()===storeName && String(rows[i][1]||"").trim()===staffName) { ws.deleteRow(i+1); break; }
   }
+}
+
+// ─ 店舗追加 ─
+// goals: { sales, newGuest, repeat, total, unitPrice, ticket, royalty, wholesale, svSales }
+function addStoreFn(sv, name, ym, goals) {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_GOAL);
+  const row = new Array(35).fill('');
+  row[0] = '加盟'; row[1] = sv; row[2] = name; row[3] = String(ym); row[4] = 'TRUE';
+  if (goals.sales      !== undefined) row[5]  = Number(goals.sales)      || '';
+  if (goals.newGuest   !== undefined) row[6]  = Number(goals.newGuest)   || '';
+  if (goals.repeat     !== undefined) row[7]  = Number(goals.repeat)     || '';
+  if (goals.total      !== undefined) row[8]  = Number(goals.total)      || '';
+  if (goals.unitPrice  !== undefined) row[9]  = Number(goals.unitPrice)  || '';
+  if (goals.ticket     !== undefined) row[14] = Number(goals.ticket)     || '';
+  if (goals.royalty    !== undefined) row[32] = Number(goals.royalty)    || '';
+  if (goals.wholesale  !== undefined) row[33] = Number(goals.wholesale)  || '';
+  if (goals.svSales    !== undefined) row[34] = Number(goals.svSales)    || '';
+  ws.appendRow(row);
+}
+
+// ─ 目標更新（行が無ければ追加） ─
+// goals: 同上
+function updateGoalFn(name, ym, goals) {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_GOAL);
+  const rows = ws.getDataRange().getValues();
+  const ymStr = String(ym);
+  // col番号は1-indexed
+  const colMap = { sales:6, newGuest:7, repeat:8, total:9, unitPrice:10,
+                   ticket:15, royalty:33, wholesale:34, svSales:35 };
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][2]||'').trim() === name && String(rows[i][3]||'').trim() === ymStr) {
+      for (const [key, col] of Object.entries(colMap)) {
+        if (goals[key] !== undefined) ws.getRange(i+1, col).setValue(Number(goals[key]) || '');
+      }
+      return;
+    }
+  }
+  // 行が存在しない場合は新規追加
+  const svRow = rows.find(r => String(r[2]||'').trim() === name);
+  const sv = svRow ? String(svRow[1]||'') : '';
+  addStoreFn(sv, name, ym, goals);
 }
 
 function json(data) {
