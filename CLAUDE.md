@@ -8,7 +8,7 @@
 ## GAS API エンドポイント
 
 ```
-https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGRDARtPrtnZLEoJMvWl3XWM7Y9dXCVXRIH52wtbjO94/exec
+https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec
 ```
 
 このURLへのPOSTで全操作が完結します。スプレッドシートへの直接アクセスは不要です。
@@ -27,7 +27,7 @@ https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGRDARtPrtnZLEoJM
 ### 1. 現在のデータ確認（GET）
 
 ```bash
-curl "https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGRDARtPrtnZLEoJMvWl3XWM7Y9dXCVXRIH52wtbjO94/exec" -L
+curl "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec" -L
 ```
 
 `stores` / `tasks` / `staffRanks` が返ります。
@@ -39,7 +39,7 @@ curl "https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGRDARtPrtn
 新しい加盟店を追加する場合:
 
 ```bash
-curl -X POST "https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGRDARtPrtnZLEoJMvWl3XWM7Y9dXCVXRIH52wtbjO94/exec" \
+curl -X POST "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "addStore",
@@ -81,7 +81,7 @@ curl -X POST "https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGR
 既存店舗の月次目標を変更する場合（行が無ければ自動追加）:
 
 ```bash
-curl -X POST "https://script.google.com/macros/s/AKfycbzh4nxii7JrG4b2RhVQicHxiGRDARtPrtnZLEoJMvWl3XWM7Y9dXCVXRIH52wtbjO94/exec" \
+curl -X POST "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "updateGoal",
@@ -143,7 +143,21 @@ curl -X POST "..." \
 - フェリーチェ（`f`/`F`系店舗）は加盟店分析から除外して扱う
 - 売上データは内密扱い。不用意な共有・出力はしない
 - GAS APIはDeployされたウェブアプリのURL。スクリプトを変更した場合は**再デプロイが必要**
-  - GASエディタ → デプロイ → デプロイを管理 → 新しいバージョンとしてデプロイ
+
+## GAS 更新・再デプロイ手順（clasp）
+
+```bash
+cd /Users/yamadamasaya/sv-portal
+clasp push                           # gas_api.gs をGASプロジェクトに反映
+clasp deploy --description "説明"    # 新バージョンとしてデプロイ → 新URLが発行される
+```
+
+デプロイ後、URLが変わった場合は `index.html` の `API_URL` と `CLAUDE.md` のURLを更新してgit push。
+
+**GASエディタURL（権限承認・デバッグ用）:**
+```
+https://script.google.com/d/1FdMryXF5JaS4CkoKJSdzJvIOnplwLsVz-Agx3pXgd8CFADaFhtCo818H/edit
+```
 
 ---
 
