@@ -632,6 +632,9 @@ function storeCard(s,i){
       <div class="mikomi-bar"><div class="mikomi-bar-f" style="width:${Math.min(s.見込み達成率||0,100)}%;background:${mp}"></div></div>
     </div>`:""}
   </div>
+  <div style="padding:8px 12px 12px">
+    <button onclick="openAgendaModal('${s.name.replace(/'/g,"\\'")}')" style="width:100%;padding:8px;background:var(--acc);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">📋 アジェンダ作成</button>
+  </div>
 </div>`;
 }
 
@@ -1017,6 +1020,65 @@ function openTaskModal(storeName,row){
   document.body.insertAdjacentHTML("beforeend",html);
 }
 function closeModal(){const m=document.getElementById("task-modal");if(m)m.remove();}
+
+// ─ アジェンダモーダル ─
+function openAgendaModal(storeName){
+  const html=`<div class="modal-overlay" id="agenda-modal" onclick="if(event.target===this)closeAgendaModal()">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-head">
+        <div class="modal-ttl">📋 アジェンダ作成 — ${storeName}</div>
+        <button class="modal-close" onclick="closeAgendaModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-field" style="margin-bottom:12px">
+          <label class="form-label">出力形式</label>
+          <div style="display:flex;gap:8px">
+            <label style="flex:1;display:flex;align-items:center;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:8px;cursor:pointer">
+              <input type="radio" name="agenda-fmt" value="doc" checked> Google ドキュメント
+            </label>
+            <label style="flex:1;display:flex;align-items:center;gap:6px;padding:10px;border:1.5px solid var(--bdr);border-radius:8px;cursor:pointer">
+              <input type="radio" name="agenda-fmt" value="slides"> Google スライド
+            </label>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">その他・自由記入</label>
+          <textarea class="form-inp full form-textarea" id="agenda-memo" placeholder="次回MTG日程、連絡事項など" style="min-height:80px"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-cancel" onclick="closeAgendaModal()">キャンセル</button>
+        <button class="btn-save" onclick="generateAgenda('${storeName.replace(/'/g,"\\'")}')">生成</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML("beforeend",html);
+}
+function closeAgendaModal(){const m=document.getElementById("agenda-modal");if(m)m.remove();}
+async function generateAgenda(storeName){
+  const fmt=document.querySelector("input[name='agenda-fmt']:checked")?.value||"doc";
+  const memo=document.getElementById("agenda-memo")?.value||"";
+  closeAgendaModal();
+  const btn=document.querySelector(`button[onclick*="${storeName}"]`);
+  const origText="📋 アジェンダ作成";
+  // ローディング表示
+  const loadEl=document.createElement("div");
+  loadEl.id="agenda-loading";
+  loadEl.style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center";
+  loadEl.innerHTML=`<div style="background:var(--sur);padding:24px 32px;border-radius:12px;text-align:center;color:var(--ink)"><div style="font-size:24px;margin-bottom:8px">⏳</div><div>アジェンダを生成中...</div></div>`;
+  document.body.appendChild(loadEl);
+  try{
+    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"createAgenda",store:storeName,format:fmt,memo})});
+    const j=await res.json();
+    document.getElementById("agenda-loading")?.remove();
+    if(j.ok&&j.url){window.open(j.url,"_blank");}
+    else alert("生成失敗: "+(j.error||""));
+  }catch(e){
+    document.getElementById("agenda-loading")?.remove();
+    alert("通信エラー: "+e.message);
+  }
+}
+
 function autoFillSV(){
   const sn=document.getElementById("m-store")?.value;
   const sv=stores.find(s=>s.name===sn)?.sv||"";

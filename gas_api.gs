@@ -66,6 +66,10 @@ function doPost(e) {
       updateGoalFn(data.name, data.ym, data.goals || {});
       return json({ ok: true });
     }
+    if (data.action === "createAgenda") {
+      const url = createAgenda(data.store, data.format || "doc", data.memo || "");
+      return json({ ok: true, url });
+    }
     return json({ error: "unknown action" });
   } catch(err) {
     return json({ error: err.toString() });
@@ -534,6 +538,173 @@ function updateGoalFn(name, ym, goals) {
   const svRow = rows.find(r => String(r[2]||'').trim() === name);
   const sv = svRow ? String(svRow[1]||'') : '';
   addStoreFn(sv, name, ym, goals);
+}
+
+// ─ アジェンダ生成 ─
+function createAgenda(storeName, format, memo) {
+  // 店舗データ取得
+  const stores = getStores();
+  const s = stores.find(st => st.name === storeName);
+  if (!s) throw new Error("店舗が見つかりません: " + storeName);
+
+  // タスク取得（未完了のみ）
+  const allTasks = getTasks();
+  const storeTasks = allTasks.filter(t => t.store === storeName && t.status !== "完了");
+
+  // 4象限判定
+  const total = (s.新規実績 || 0) + (s.再来実績 || 0);
+  const newRatio = total > 0 ? s.新規実績 / total : 0.5;
+  const unitPrice = s.客単価実績 || 0;
+  const unitGoal  = s.客単価目標 || 5000;
+  const isHighPrice = unitPrice >= unitGoal;
+  const isNewMajor  = newRatio >= 0.5;
+  let quadrant = "";
+  let quadrantMsg = "";
+  if (isHighPrice && isNewMajor)  { quadrant = "優良新規"; quadrantMsg = "高単価×新規中心。VIPへの転換を促す施策が重要。"; }
+  else if (isHighPrice && !isNewMajor) { quadrant = "VIP";    quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
+  else if (!isHighPrice && isNewMajor) { quadrant = "お試し層"; quadrantMsg = "低単価×新規中心。次回予約率向上が最優先課題。"; }
+  else                                  { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
+
+  const today = new Date();
+  const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
+  const title = storeName + " オーナーMTGアジェンダ " + ym;
+
+  if (format === "slides") {
+    return createAgendaSlides(title, s, storeTasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
+  } else {
+    return createAgendaDoc(title, s, storeTasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
+  }
+}
+
+function createAgendaDoc(title, s, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
+  const doc = DocumentApp.create(title);
+  const body = doc.getBody();
+  body.clear();
+
+  const today = new Date();
+  const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
+
+  // タイトル
+  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.TITLE);
+  body.appendParagraph("作成日: " + Utilities.formatDate(today, "Asia/Tokyo", "yyyy/MM/dd")).setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  body.appendParagraph("");
+
+  // 1. 店舗サマリー
+  body.appendParagraph("1. 店舗サマリー").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  const table1 = body.appendTable([
+    ["項目", "実績", "目標", "達成率"],
+    ["売上", "¥" + Math.round(s.実績売上 || 0).toLocaleString(), "¥" + Math.round(s.売上目標 || 0).toLocaleString(), (s.達成率 || 0) + "%"],
+    ["月末見込み売上", "¥" + Math.round(s.見込み売上 || 0).toLocaleString(), "¥" + Math.round(s.売上目標 || 0).toLocaleString(), (s.見込み達成率 || 0) + "%"],
+    ["ロイヤリティ", "¥" + Math.round(s.ロイヤリティ実績 || 0).toLocaleString(), "¥" + Math.round(s.ロイヤリティ目標 || 0).toLocaleString(), ""],
+  ]);
+  body.appendParagraph("");
+
+  // 2. KPI詳細
+  body.appendParagraph("2. KPI詳細").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  const table2 = body.appendTable([
+    ["指標", "実績", "目標"],
+    ["総客数", (s.総客数実績 || 0) + "人", (s.総客数目標 || 0) + "人"],
+    ["新規客数", (s.新規実績 || 0) + "人", (s.新規目標 || 0) + "人"],
+    ["再来客数", (s.再来実績 || 0) + "人", (s.再来目標 || 0) + "人"],
+    ["客単価", "¥" + Math.round(s.客単価実績 || 0).toLocaleString(), "¥" + Math.round(s.客単価目標 || 0).toLocaleString()],
+    ["次回予約率", Math.round((s.次回予約率実績 || 0) * 100) + "%", "—"],
+    ["回数券売上", "¥" + Math.round(s.回数券売上実績 || 0).toLocaleString(), "¥" + Math.round(s.回数券売上目標 || 0).toLocaleString()],
+    ["物販売上", "¥" + Math.round(s.物販売上実績 || 0).toLocaleString(), "—"],
+  ]);
+  body.appendParagraph("");
+
+  // 3. 顧客象限分析
+  body.appendParagraph("3. 顧客象限分析").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph("現在のポジション: 【" + quadrant + "】").setBold(true);
+  body.appendParagraph(quadrantMsg);
+  const newPct = Math.round(newRatio * 100);
+  const table3 = body.appendTable([
+    ["指標", "現状"],
+    ["新規比率", newPct + "% (再来" + (100 - newPct) + "%)"],
+    ["客単価 vs 目標", (unitPrice >= unitGoal ? "▲ 目標達成 " : "▼ 目標未達 ") + "¥" + Math.round(unitPrice).toLocaleString() + " / 目標¥" + Math.round(unitGoal).toLocaleString()],
+    ["フェーズ", quadrant],
+    ["推奨アクション", quadrantMsg],
+  ]);
+  body.appendParagraph("");
+  body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環");
+  body.appendParagraph("");
+
+  // 4. 改善アクション・課題
+  body.appendParagraph("4. 改善アクション・課題").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  if (tasks.length === 0) {
+    body.appendParagraph("現在の未完了タスクはありません。");
+  } else {
+    const taskRows = [["カテゴリ", "タスク名", "優先度", "ステータス", "メモ"]];
+    tasks.forEach(t => taskRows.push([t.category || "", t.taskName || "", t.priority || "", t.status || "", t.memo || ""]));
+    body.appendTable(taskRows);
+  }
+  body.appendParagraph("");
+
+  // 5. その他
+  body.appendParagraph("5. その他").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph(memo || "（なし）");
+  body.appendParagraph("");
+
+  doc.saveAndClose();
+  return doc.getUrl();
+}
+
+function createAgendaSlides(title, s, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
+  const pres = SlidesApp.create(title);
+  const slides = pres.getSlides();
+
+  // スライド1: タイトル
+  const slide1 = slides[0];
+  slide1.getPlaceholder(SlidesApp.PlaceholderType.CENTERED_TITLE).asShape().getText().setText(title);
+  slide1.getPlaceholder(SlidesApp.PlaceholderType.SUBTITLE).asShape().getText().setText(
+    "担当SV: " + s.sv + "\n" + Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd")
+  );
+
+  function addSlide(titleText, bodyText) {
+    const sl = pres.appendSlide(SlidesApp.PredefinedLayout.TITLE_AND_BODY);
+    sl.getPlaceholder(SlidesApp.PlaceholderType.TITLE).asShape().getText().setText(titleText);
+    sl.getPlaceholder(SlidesApp.PlaceholderType.BODY).asShape().getText().setText(bodyText);
+    return sl;
+  }
+
+  // スライド2: 店舗サマリー
+  addSlide("1. 店舗サマリー",
+    "売上実績: ¥" + Math.round(s.実績売上 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.売上目標 || 0).toLocaleString() + " (" + (s.達成率 || 0) + "%)\n" +
+    "月末見込み: ¥" + Math.round(s.見込み売上 || 0).toLocaleString() + " (" + (s.見込み達成率 || 0) + "%)\n" +
+    "ロイヤリティ: ¥" + Math.round(s.ロイヤリティ実績 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.ロイヤリティ目標 || 0).toLocaleString()
+  );
+
+  // スライド3: KPI詳細
+  addSlide("2. KPI詳細",
+    "総客数: " + (s.総客数実績 || 0) + "人 / 目標 " + (s.総客数目標 || 0) + "人\n" +
+    "新規: " + (s.新規実績 || 0) + "人 / 再来: " + (s.再来実績 || 0) + "人\n" +
+    "客単価: ¥" + Math.round(s.客単価実績 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.客単価目標 || 0).toLocaleString() + "\n" +
+    "次回予約率: " + Math.round((s.次回予約率実績 || 0) * 100) + "%\n" +
+    "回数券売上: ¥" + Math.round(s.回数券売上実績 || 0).toLocaleString() + "\n" +
+    "物販売上: ¥" + Math.round(s.物販売上実績 || 0).toLocaleString()
+  );
+
+  // スライド4: 顧客象限
+  const newPct = Math.round(newRatio * 100);
+  addSlide("3. 顧客象限分析",
+    "現在のポジション: 【" + quadrant + "】\n\n" +
+    quadrantMsg + "\n\n" +
+    "新規比率: " + newPct + "% / 再来: " + (100 - newPct) + "%\n" +
+    "客単価: ¥" + Math.round(unitPrice).toLocaleString() + " (目標比: " + (unitPrice >= unitGoal ? "▲ 達成" : "▼ 未達") + ")\n\n" +
+    "サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環"
+  );
+
+  // スライド5: 改善アクション
+  const taskText = tasks.length === 0
+    ? "現在の未完了タスクはありません。"
+    : tasks.map(t => "【" + (t.priority || "") + "】[" + (t.category || "") + "] " + t.taskName + (t.memo ? " (" + t.memo + ")" : "")).join("\n");
+  addSlide("4. 改善アクション・課題", taskText);
+
+  // スライド6: その他
+  addSlide("5. その他", memo || "（なし）");
+
+  pres.saveAndClose();
+  return pres.getUrl();
 }
 
 function json(data) {
