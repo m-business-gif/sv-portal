@@ -651,31 +651,41 @@ function createAgendaDoc(title, s, tasks, quadrant, quadrantMsg, memo, newRatio,
 
 function createAgendaSlides(title, s, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
   const pres = SlidesApp.create(title);
-  const slides = pres.getSlides();
+  // 既存の最初のスライドを削除して白紙から作る
+  const firstSlide = pres.getSlides()[0];
 
-  // スライド1: タイトル
-  const slide1 = slides[0];
-  slide1.getPlaceholder(SlidesApp.PlaceholderType.CENTERED_TITLE).asShape().getText().setText(title);
-  slide1.getPlaceholder(SlidesApp.PlaceholderType.SUBTITLE).asShape().getText().setText(
-    "担当SV: " + s.sv + "\n" + Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd")
-  );
-
-  function addSlide(titleText, bodyText) {
-    const sl = pres.appendSlide(SlidesApp.PredefinedLayout.TITLE_AND_BODY);
-    sl.getPlaceholder(SlidesApp.PlaceholderType.TITLE).asShape().getText().setText(titleText);
-    sl.getPlaceholder(SlidesApp.PlaceholderType.BODY).asShape().getText().setText(bodyText);
+  function addTextSlide(titleText, bodyText) {
+    const sl = pres.appendSlide();
+    sl.getPageElements().forEach(el => el.remove());
+    // タイトル
+    const tb1 = sl.insertTextBox(titleText, 40, 30, 880, 60);
+    tb1.getText().getTextStyle().setBold(true).setFontSize(24);
+    // 本文
+    const tb2 = sl.insertTextBox(bodyText, 40, 110, 880, 380);
+    tb2.getText().getTextStyle().setFontSize(14);
     return sl;
   }
 
+  // スライド1: タイトル（既存スライドを使う）
+  firstSlide.getPageElements().forEach(el => el.remove());
+  const tb = firstSlide.insertTextBox(title, 40, 200, 880, 80);
+  tb.getText().getTextStyle().setBold(true).setFontSize(28);
+  const tb2 = firstSlide.insertTextBox(
+    "担当SV: " + s.sv + "　" + Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd"),
+    40, 300, 880, 40
+  );
+  tb2.getText().getTextStyle().setFontSize(16);
+
   // スライド2: 店舗サマリー
-  addSlide("1. 店舗サマリー",
+  const newPct = Math.round(newRatio * 100);
+  addTextSlide("1. 店舗サマリー",
     "売上実績: ¥" + Math.round(s.実績売上 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.売上目標 || 0).toLocaleString() + " (" + (s.達成率 || 0) + "%)\n" +
     "月末見込み: ¥" + Math.round(s.見込み売上 || 0).toLocaleString() + " (" + (s.見込み達成率 || 0) + "%)\n" +
     "ロイヤリティ: ¥" + Math.round(s.ロイヤリティ実績 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.ロイヤリティ目標 || 0).toLocaleString()
   );
 
   // スライド3: KPI詳細
-  addSlide("2. KPI詳細",
+  addTextSlide("2. KPI詳細",
     "総客数: " + (s.総客数実績 || 0) + "人 / 目標 " + (s.総客数目標 || 0) + "人\n" +
     "新規: " + (s.新規実績 || 0) + "人 / 再来: " + (s.再来実績 || 0) + "人\n" +
     "客単価: ¥" + Math.round(s.客単価実績 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.客単価目標 || 0).toLocaleString() + "\n" +
@@ -685,8 +695,7 @@ function createAgendaSlides(title, s, tasks, quadrant, quadrantMsg, memo, newRat
   );
 
   // スライド4: 顧客象限
-  const newPct = Math.round(newRatio * 100);
-  addSlide("3. 顧客象限分析",
+  addTextSlide("3. 顧客象限分析",
     "現在のポジション: 【" + quadrant + "】\n\n" +
     quadrantMsg + "\n\n" +
     "新規比率: " + newPct + "% / 再来: " + (100 - newPct) + "%\n" +
@@ -698,10 +707,10 @@ function createAgendaSlides(title, s, tasks, quadrant, quadrantMsg, memo, newRat
   const taskText = tasks.length === 0
     ? "現在の未完了タスクはありません。"
     : tasks.map(t => "【" + (t.priority || "") + "】[" + (t.category || "") + "] " + t.taskName + (t.memo ? " (" + t.memo + ")" : "")).join("\n");
-  addSlide("4. 改善アクション・課題", taskText);
+  addTextSlide("4. 改善アクション・課題", taskText);
 
   // スライド6: その他
-  addSlide("5. その他", memo || "（なし）");
+  addTextSlide("5. その他", memo || "（なし）");
 
   pres.saveAndClose();
   return pres.getUrl();
