@@ -9,6 +9,7 @@ const SHEET_TASK   = "タスクボード";
 const SHEET_MIKOMI = "見込み数値";
 const SHEET_STAFF  = "スタッフランク";
 const SHEET_SALES  = "スタッフ売上（9~2月）";
+const SHEET_CONFIG = "設定";
 
 // タスクボード列定義
 // A:店舗名 B:担当SV C:カテゴリ D:タスク名 E:ステータス F:優先度 G:メモ H:完了日
@@ -30,7 +31,9 @@ function doGet(e) {
       const h = ws.getRange(1,1,1,1).getValue();
       if (String(h||"").trim() !== "店舗名") setupTaskBoard();
     }
-    return json({ stores: getStores(), tasks: getTasks(), staffRanks: getStaffRanks(), staffSales: getStaffSales() });
+    // 設定シートが存在しなければ自動作成
+    if (!sheetNames.includes(SHEET_CONFIG)) setupConfig();
+    return json({ stores: getStores(), tasks: getTasks(), staffRanks: getStaffRanks(), staffSales: getStaffSales(), config: getConfig() });
   } catch(err) {
     return json({ error: err.toString() });
   }
@@ -67,6 +70,50 @@ function doPost(e) {
   } catch(err) {
     return json({ error: err.toString() });
   }
+}
+
+// ─ 設定シート ─
+function setupConfig() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  let ws = ss.getSheetByName(SHEET_CONFIG);
+  if (!ws) ws = ss.insertSheet(SHEET_CONFIG);
+  ws.clearContents();
+  ws.getRange(1,1,1,3).setValues([["種別","値1","値2"]]);
+  ws.getRange(1,1,1,3).setFontWeight("bold").setBackground("#f1f5f9");
+  const defaults = [
+    ["SV","山田","#2563eb"],
+    ["SV","髙橋","#7c3aed"],
+    ["SV","向井","#0891b2"],
+    ["SV","子龍","#059669"],
+    ["SV","宮脇","#c2410c"],
+    ["カテゴリ","集客",""],
+    ["カテゴリ","教育",""],
+    ["カテゴリ","店舗運営",""],
+    ["カテゴリ","数値管理",""],
+    ["カテゴリ","MTG",""],
+    ["カテゴリ","HP/SNS",""],
+    ["カテゴリ","その他",""],
+  ];
+  ws.getRange(2,1,defaults.length,3).setValues(defaults);
+  ws.setColumnWidths(1,3,[100,120,100]);
+}
+
+function getConfig() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_CONFIG);
+  if (!ws) return { svList: [], taskCats: [] };
+  const rows = ws.getDataRange().getValues();
+  const svList = [];
+  const taskCats = [];
+  for (let i = 1; i < rows.length; i++) {
+    const type = String(rows[i][0]||"").trim();
+    const v1   = String(rows[i][1]||"").trim();
+    const v2   = String(rows[i][2]||"").trim();
+    if (!v1) continue;
+    if (type === "SV") svList.push({ name: v1, color: v2||"#6b7280" });
+    else if (type === "カテゴリ") taskCats.push(v1);
+  }
+  return { svList, taskCats };
 }
 
 // ─ タスクボード初期セットアップ ─

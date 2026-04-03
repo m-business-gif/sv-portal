@@ -426,7 +426,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 </div>
 
 <script>
-const SVC={"山田":"#2563eb","髙橋":"#7c3aed","向井":"#0891b2","子龍":"#059669","宮脇":"#c2410c"};
+let SVC={"山田":"#2563eb","髙橋":"#7c3aed","向井":"#0891b2","子龍":"#059669","宮脇":"#c2410c"};
 const svc=sv=>SVC[sv]||"#6b7280";
 const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
@@ -510,6 +510,10 @@ async function loadData(){
     const data=await res.json();
     if(data.error)throw new Error(data.error);
     stores=data.stores||[];tasks=data.tasks||[];staffRanks=data.staffRanks||[];staffSales=data.staffSales||[];
+    if(data.config){
+      if(data.config.svList&&data.config.svList.length){SVC={};data.config.svList.forEach(s=>{SVC[s.name]=s.color;});}
+      if(data.config.taskCats&&data.config.taskCats.length){TASK_CATS=data.config.taskCats;}
+    }
     setSyncStatus("ok");
     initSelects();render();
   }catch(e){
@@ -751,7 +755,7 @@ function renderMikomi(){
 
 // ─ TASK BOARD ─
 // ─ TASK BOARD (NEW) ─
-const TASK_CATS=["集客","教育","店舗運営","数値管理","MTG","HP/SNS","その他"];
+let TASK_CATS=["集客","教育","店舗運営","数値管理","MTG","HP/SNS","その他"];
 const TASK_STATUS=["未着手","進行中","完了"];
 const TASK_PRI=["高","中","低"];
 const PRI_COLOR={高:"#ef4444",中:"#f59e0b",低:"#94a3b8"};
