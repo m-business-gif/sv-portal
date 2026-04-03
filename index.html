@@ -432,7 +432,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-let API_URL=localStorage.getItem("gas_url")||"https://script.google.com/macros/s/AKfycbz0Ztsg0lkfy5ttb8k1r0LsU2145BBeq74C0nyvnZUjJ4s5R4NRgJNx3ts941KI9yxy/exec";
+let API_URL=localStorage.getItem("gas_url")||"https://script.google.com/macros/s/AKfycbyoK1OtEExNAE44nYAkjMewYlspHGqWltSsQkCigzDdm38aCZSvMdXZsYg_4vGGdiq7/exec";
 let mySV=localStorage.getItem("my_sv")||"";
 let mode="all";
 let stores=[],tasks=[],staffRanks=[],staffSales=[];
