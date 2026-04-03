@@ -67,8 +67,8 @@ function doPost(e) {
       return json({ ok: true });
     }
     if (data.action === "createAgenda") {
-      const url = createAgenda(data.store, data.format || "doc", data.memo || "");
-      return json({ ok: true, url });
+      const result = createAgenda(data.store, data.format || "doc", data.memo || "");
+      return json({ ok: true, html: result.html, title: result.title });
     }
     return json({ error: "unknown action" });
   } catch(err) {
@@ -540,14 +540,12 @@ function updateGoalFn(name, ym, goals) {
   addStoreFn(sv, name, ym, goals);
 }
 
-// ─ アジェンダ生成 ─
+// ─ アジェンダ生成（HTML形式で返す） ─
 function createAgenda(storeName, format, memo) {
-  // 店舗データ取得
   const stores = getStores();
   const s = stores.find(st => st.name === storeName);
   if (!s) throw new Error("店舗が見つかりません: " + storeName);
 
-  // タスク取得（未完了のみ）
   const allTasks = getTasks();
   const storeTasks = allTasks.filter(t => t.store === storeName && t.status !== "完了");
 
@@ -558,22 +556,91 @@ function createAgenda(storeName, format, memo) {
   const unitGoal  = s.客単価目標 || 5000;
   const isHighPrice = unitPrice >= unitGoal;
   const isNewMajor  = newRatio >= 0.5;
-  let quadrant = "";
-  let quadrantMsg = "";
-  if (isHighPrice && isNewMajor)  { quadrant = "優良新規"; quadrantMsg = "高単価×新規中心。VIPへの転換を促す施策が重要。"; }
-  else if (isHighPrice && !isNewMajor) { quadrant = "VIP";    quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
+  let quadrant = "", quadrantMsg = "";
+  if (isHighPrice && isNewMajor)       { quadrant = "優良新規"; quadrantMsg = "高単価×新規中心。VIPへの転換を促す施策が重要。"; }
+  else if (isHighPrice && !isNewMajor) { quadrant = "VIP";      quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
   else if (!isHighPrice && isNewMajor) { quadrant = "お試し層"; quadrantMsg = "低単価×新規中心。次回予約率向上が最優先課題。"; }
-  else                                  { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
+  else                                 { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
 
   const today = new Date();
   const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
+  const dateStr = Utilities.formatDate(today, "Asia/Tokyo", "yyyy/MM/dd");
   const title = storeName + " オーナーMTGアジェンダ " + ym;
+  const newPct = Math.round(newRatio * 100);
 
-  if (format === "slides") {
-    return createAgendaSlides(title, s, storeTasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
-  } else {
-    return createAgendaDoc(title, s, storeTasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
-  }
+  const fmt = n => Math.round(n || 0).toLocaleString();
+  const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + "%" : "—";
+
+  const taskRows = storeTasks.length === 0
+    ? "<tr><td colspan='4' style='text-align:center;color:#888'>未完了タスクなし</td></tr>"
+    : storeTasks.map(t => `<tr><td>${t.category||""}</td><td>${t.taskName||""}</td><td>${t.priority||""}</td><td>${t.status||""}</td></tr>`).join("");
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  body{font-family:'Hiragino Kaku Gothic Pro',sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1e293b;line-height:1.6}
+  h1{font-size:22px;border-bottom:3px solid #2563eb;padding-bottom:8px;color:#1e40af}
+  h2{font-size:16px;background:#f1f5f9;padding:8px 12px;border-radius:6px;margin-top:28px}
+  table{width:100%;border-collapse:collapse;margin:8px 0}
+  th{background:#e2e8f0;padding:8px;text-align:left;font-size:13px}
+  td{padding:8px;border-bottom:1px solid #e2e8f0;font-size:13px}
+  .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-weight:700;font-size:14px;background:#dbeafe;color:#1d4ed8}
+  .meta{color:#64748b;font-size:13px;margin-bottom:20px}
+  .note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap}
+  @media print{body{margin:20px}button{display:none}}
+</style>
+</head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h1>${title}</h1>
+    <div class="meta">担当SV: ${s.sv}　作成日: ${dateStr}</div>
+  </div>
+  <button onclick="window.print()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">🖨 印刷</button>
+</div>
+
+<h2>1. 店舗サマリー</h2>
+<table>
+  <tr><th>項目</th><th>実績</th><th>目標</th><th>達成率</th></tr>
+  <tr><td>売上</td><td>¥${fmt(s.実績売上)}</td><td>¥${fmt(s.売上目標)}</td><td>${s.達成率||0}%</td></tr>
+  <tr><td>月末見込み売上</td><td>¥${fmt(s.見込み売上)}</td><td>¥${fmt(s.売上目標)}</td><td>${s.見込み達成率||0}%</td></tr>
+  <tr><td>ロイヤリティ</td><td>¥${fmt(s.ロイヤリティ実績)}</td><td>¥${fmt(s.ロイヤリティ目標)}</td><td>${pct(s.ロイヤリティ実績,s.ロイヤリティ目標)}</td></tr>
+  <tr><td>SV売上</td><td>¥${fmt(s.SV売上実績)}</td><td>¥${fmt(s.SV売上目標)}</td><td>${pct(s.SV売上実績,s.SV売上目標)}</td></tr>
+</table>
+
+<h2>2. KPI詳細</h2>
+<table>
+  <tr><th>指標</th><th>実績</th><th>目標</th></tr>
+  <tr><td>総客数</td><td>${fmt(s.総客数実績)}人</td><td>${fmt(s.総客数目標)}人</td></tr>
+  <tr><td>新規客数</td><td>${fmt(s.新規実績)}人</td><td>${fmt(s.新規目標)}人</td></tr>
+  <tr><td>再来客数</td><td>${fmt(s.再来実績)}人</td><td>${fmt(s.再来目標)}人</td></tr>
+  <tr><td>客単価</td><td>¥${fmt(s.客単価実績)}</td><td>¥${fmt(s.客単価目標)}</td></tr>
+  <tr><td>次回予約率</td><td>${Math.round((s.次回予約率実績||0)*100)}%</td><td>—</td></tr>
+  <tr><td>回数券売上</td><td>¥${fmt(s.回数券売上実績)}</td><td>¥${fmt(s.回数券売上目標)}</td></tr>
+  <tr><td>物販売上</td><td>¥${fmt(s.物販売上実績)}</td><td>—</td></tr>
+</table>
+
+<h2>3. 顧客象限分析</h2>
+<p>現在のポジション: <span class="badge">${quadrant}</span></p>
+<p>${quadrantMsg}</p>
+<table>
+  <tr><th>指標</th><th>現状</th></tr>
+  <tr><td>新規比率</td><td>${newPct}%（再来${100-newPct}%）</td></tr>
+  <tr><td>客単価 vs 目標</td><td>${unitPrice>=unitGoal?"▲ 目標達成":"▼ 目標未達"}　¥${fmt(unitPrice)} / 目標¥${fmt(unitGoal)}</td></tr>
+</table>
+<p style="font-size:12px;color:#64748b;margin-top:8px">集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環</p>
+
+<h2>4. 改善アクション・課題</h2>
+<table>
+  <tr><th>カテゴリ</th><th>タスク名</th><th>優先度</th><th>ステータス</th></tr>
+  ${taskRows}
+</table>
+
+<h2>5. その他</h2>
+<div class="note">${memo || "（なし）"}</div>
+
+</body></html>`;
+
+  return { html, title };
 }
 
 function createAgendaDoc(title, s, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {

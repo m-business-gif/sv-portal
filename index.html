@@ -432,7 +432,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-let API_URL=localStorage.getItem("gas_url")||"https://script.google.com/macros/s/AKfycbwrSR3t_9JnaTwMl1EnENukMFFvI40BvZ4d-efpDCbO5zucplDuEHUTIhT2EFMQWf5g/exec";
+let API_URL=localStorage.getItem("gas_url")||"https://script.google.com/macros/s/AKfycbz0Ztsg0lkfy5ttb8k1r0LsU2145BBeq74C0nyvnZUjJ4s5R4NRgJNx3ts941KI9yxy/exec";
 let mySV=localStorage.getItem("my_sv")||"";
 let mode="all";
 let stores=[],tasks=[],staffRanks=[],staffSales=[];
@@ -1071,8 +1071,11 @@ async function generateAgenda(storeName){
     const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"createAgenda",store:storeName,format:fmt,memo})});
     const j=await res.json();
     document.getElementById("agenda-loading")?.remove();
-    if(j.ok&&j.url){window.open(j.url,"_blank");}
-    else alert("生成失敗: "+(j.error||""));
+    if(j.ok&&j.html){
+      const w=window.open("","_blank");
+      w.document.write(j.html);
+      w.document.close();
+    } else alert("生成失敗: "+(j.error||""));
   }catch(e){
     document.getElementById("agenda-loading")?.remove();
     alert("通信エラー: "+e.message);
