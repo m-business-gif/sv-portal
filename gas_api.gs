@@ -9,7 +9,7 @@ const SHEET_TASK   = "タスクボード";
 const SHEET_MIKOMI = "見込み数値";
 const SHEET_STAFF  = "スタッフランク";
 const SHEET_SALES  = "スタッフ売上（9~2月）";
-const SHEET_CONFIG = "設定";
+const SHEET_CONFIG = "【眉毛】加盟店管理集計";
 
 // タスクボード列定義
 // A:店舗名 B:担当SV C:カテゴリ D:タスク名 E:ステータス F:優先度 G:メモ H:完了日
@@ -77,7 +77,8 @@ function setupConfig() {
   const ss = SpreadsheetApp.openById(SS_ID);
   let ws = ss.getSheetByName(SHEET_CONFIG);
   if (!ws) ws = ss.insertSheet(SHEET_CONFIG);
-  ws.clearContents();
+  // 既にデータがある場合は上書きしない
+  if (ws.getLastRow() > 0) return;
   ws.getRange(1,1,1,3).setValues([["種別","値1","値2"]]);
   ws.getRange(1,1,1,3).setFontWeight("bold").setBackground("#f1f5f9");
   const defaults = [
