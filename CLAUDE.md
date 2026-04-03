@@ -8,7 +8,7 @@
 ## GAS API エンドポイント
 
 ```
-https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec
+https://script.google.com/macros/s/AKfycbxuvhHTZqn8PUT1qOKCaPRterLr6TnXR_mDgwwArp0QOi_wlyhmeOmsISIqdLiR-oFQ/exec
 ```
 
 このURLへのPOSTで全操作が完結します。スプレッドシートへの直接アクセスは不要です。
@@ -27,7 +27,7 @@ https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2G
 ### 1. 現在のデータ確認（GET）
 
 ```bash
-curl "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec" -L
+curl "https://script.google.com/macros/s/AKfycbxuvhHTZqn8PUT1qOKCaPRterLr6TnXR_mDgwwArp0QOi_wlyhmeOmsISIqdLiR-oFQ/exec" -L
 ```
 
 `stores` / `tasks` / `staffRanks` が返ります。
@@ -39,7 +39,7 @@ curl "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qL
 新しい加盟店を追加する場合:
 
 ```bash
-curl -X POST "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec" \
+curl -X POST "https://script.google.com/macros/s/AKfycbxuvhHTZqn8PUT1qOKCaPRterLr6TnXR_mDgwwArp0QOi_wlyhmeOmsISIqdLiR-oFQ/exec" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "addStore",
@@ -81,7 +81,7 @@ curl -X POST "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk
 既存店舗の月次目標を変更する場合（行が無ければ自動追加）:
 
 ```bash
-curl -X POST "https://script.google.com/macros/s/AKfycbyuKP5MEYwmvgsV2kaUUPpsJCk_biBO0qLGYGn2GTRubRQEE-HVXvjIL3rfuyHU1Lzp/exec" \
+curl -X POST "https://script.google.com/macros/s/AKfycbxuvhHTZqn8PUT1qOKCaPRterLr6TnXR_mDgwwArp0QOi_wlyhmeOmsISIqdLiR-oFQ/exec" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "updateGoal",
