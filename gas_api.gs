@@ -8,7 +8,7 @@ const SHEET_REAL   = "実数値";
 const SHEET_TASK   = "タスクボード";
 const SHEET_MIKOMI = "見込み数値";
 const SHEET_STAFF  = "スタッフランク";
-const SHEET_SALES  = "スタッフ売上（9~2月）";
+const SHEET_SALES  = "売上明細（9~3月）";
 const SHEET_CONFIG = "【眉毛】加盟店管理集計";
 
 // タスクボード列定義
@@ -61,7 +61,7 @@ function doGet(e) {
     }
     // 設定シートが存在しなければ自動作成
     if (!sheetNames.includes(SHEET_CONFIG)) setupConfig();
-    const safe = fn => { try { return fn(); } catch(e) { Logger.log("doGet error: " + e); return null; } };
+    const safe = fn => { try { return fn(); } catch(err2) { Logger.log("doGet safe error: " + err2); return null; } };
     return json({
       stores:          safe(getStores) || [],
       availableMonths: safe(getAvailableMonths) || [],
@@ -105,6 +105,10 @@ function doPost(e) {
     if (data.action === "createAgenda") {
       const result = createAgenda(data.store, data.format || "doc", data.memo || "");
       return json({ ok: true, html: result.html, title: result.title });
+    }
+    if (data.action === "repairGoalSheet") {
+      const count = repairGoalSheetFn();
+      return json({ ok: true, repairedRows: count });
     }
     return json({ error: "unknown action" });
   } catch(err) {
@@ -599,6 +603,50 @@ function updateGoalFn(name, ym, goals) {
   const svRow = rows.find(r => String(r[2]||'').trim() === name);
   const sv = svRow ? String(svRow[1]||'') : '';
   addStoreFn(sv, name, ym, goals);
+}
+
+// ─ 加盟店目標シート 歴史データ修復 ─
+// 202603行（完全データあり）をテンプレートに、それ以前の年月で
+// A/B/C列（直営/加盟・SV・店舗名）が空の行を一括補完する
+function repairGoalSheetFn() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_GOAL);
+  const rows = ws.getDataRange().getValues();
+
+  // 202603のデータからテンプレート（順序付き）を構築
+  const template = [];
+  for (let i = 1; i < rows.length; i++) {
+    const ym = Math.round(parseFloat(rows[i][3]) || 0);
+    if (ym !== 202603) continue;
+    const cat = String(rows[i][0] || "").trim();
+    const sv  = String(rows[i][1] || "").trim();
+    const nm  = String(rows[i][2] || "").trim();
+    if (!nm || !sv) continue;
+    template.push([cat, sv, nm]);
+  }
+
+  // 修復対象の年月ブロックを収集（202603以外で A/B/C が空の行）
+  const ymBlocks = {}; // ym -> 行インデックス配列（0-based in rows）
+  for (let i = 1; i < rows.length; i++) {
+    const ym = Math.round(parseFloat(rows[i][3]) || 0);
+    if (ym < 200001 || ym === 202603) continue;
+    const sv = String(rows[i][1] || "").trim();
+    const nm = String(rows[i][2] || "").trim();
+    if (nm && sv) continue; // 既にデータあり
+    if (!ymBlocks[ym]) ymBlocks[ym] = [];
+    ymBlocks[ym].push(i);
+  }
+
+  let repairedRows = 0;
+  for (const ym of Object.keys(ymBlocks)) {
+    const indices = ymBlocks[ym];
+    for (let j = 0; j < indices.length && j < template.length; j++) {
+      const sheetRow = indices[j] + 1; // 1-based
+      ws.getRange(sheetRow, 1, 1, 3).setValues([template[j]]);
+      repairedRows++;
+    }
+  }
+  return repairedRows;
 }
 
 // ─ ベストプラクティス読み込み ─

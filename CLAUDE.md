@@ -22,7 +22,7 @@
 | 項目 | 値 |
 |---|---|
 | ポータルURL | `https://m-business-gif.github.io/sv-portal/` |
-| GAS APIエンドポイント | `https://script.google.com/macros/s/AKfycbx8FawQO_4UoleJzYMroSnpPFObU3dVnhgkJsrUZ68VbRFWOo1g4IBKSEGtXTfmHIMj/exec` |
+| GAS APIエンドポイント | `https://script.google.com/macros/s/AKfycbzFdNCS39cgN9113_6eLwKlQ4IsiaqWuC8hmFHxa57MZDGFk0_LttjrhOkXaY_uKYBh/exec` |
 | GASエディタ | `https://script.google.com/d/1FdMryXF5JaS4CkoKJSdzJvIOnplwLsVz-Agx3pXgd8CFADaFhtCo818H/edit` |
 | スプレッドシートID | `1K-4ub8YvFh__JrseNKGiCkGigDYykraIwocOhLQLevY` |
 | GitHubリポジトリ | `/Users/yamadamasaya/sv-portal`（ローカル） |
@@ -83,7 +83,7 @@ sv-portal/
 | `見込み数値` | 月末着地見込み | C:店舗名 D:年月 J:総客数率 K:客単価 M:回数券 O:物販 |
 | `タスクボード` | タスク管理 | A:店舗名 B:担当SV C:カテゴリ D:タスク名 E:ステータス F:優先度 G:メモ H:完了日 |
 | `スタッフランク` | 手動設定のランク | A:店舗名 B:スタッフ名 C:ランク D:点数 |
-| `スタッフ売上（9~2月）` | 売上データ（自動集計元） | 多列（A:店舗 B:日付数値 F:区分 H:カテゴリ L:件数 M:金額 N:スタッフ名） |
+| `売上明細（9~3月）` | 売上データ（自動集計元） | 多列（A:店舗 B:日付数値 F:区分 H:カテゴリ L:件数 M:金額 N:スタッフ名） |
 | `【眉毛】加盟店管理集計` | **設定シート** | A:種別(SV/カテゴリ) B:値1(名前) C:値2(カラーコード) |
 
 ---
