@@ -1072,9 +1072,10 @@ async function generateAgenda(storeName){
     const res=await fetch(url);
     const html=await res.text();
     document.getElementById("agenda-loading")?.remove();
-    const w=window.open("","_blank");
-    if(w){w.document.write(html);w.document.close();}
-    else alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してください。");
+    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+    const blobUrl=URL.createObjectURL(blob);
+    const w=window.open(blobUrl,"_blank");
+    if(!w)alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してください。");
   }catch(e){
     document.getElementById("agenda-loading")?.remove();
     alert("エラー: "+e.message);
