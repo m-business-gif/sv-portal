@@ -1059,6 +1059,9 @@ async function generateAgenda(storeName){
   const fmt=document.querySelector("input[name='agenda-fmt']:checked")?.value||"doc";
   const memo=document.getElementById("agenda-memo")?.value||"";
   closeAgendaModal();
+  // ポップアップブロック対策：ユーザー操作の直後にウィンドウを開いておく
+  const win=window.open("","_blank");
+  if(win)win.document.write('<p style="font-family:sans-serif;padding:40px">アジェンダを生成中です。しばらくお待ちください...</p>');
   const loadEl=document.createElement("div");
   loadEl.id="agenda-loading";
   loadEl.style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center";
@@ -1070,9 +1073,11 @@ async function generateAgenda(storeName){
     const data=await res.json();
     document.getElementById("agenda-loading")?.remove();
     if(!data.ok||!data.url)throw new Error(data.error||"生成失敗");
-    window.open(data.url,"_blank");
+    if(win)win.location.href=data.url;
+    else window.open(data.url,"_blank");
   }catch(e){
     document.getElementById("agenda-loading")?.remove();
+    if(win)win.close();
     alert("エラー: "+e.message);
   }
 }
