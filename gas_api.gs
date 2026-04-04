@@ -16,14 +16,32 @@ const SHEET_CONFIG = "【眉毛】加盟店管理集計";
 
 function doGet(e) {
   try {
-    // アジェンダ生成リクエスト
+    // アジェンダ生成リクエスト（JSONデータ）
     if (e && e.parameter && e.parameter.action === "createAgenda") {
       const result = createAgenda(
         e.parameter.store || "",
         e.parameter.format || "doc",
         decodeURIComponent(e.parameter.memo || "")
       );
-      return ContentService.createTextOutput(result.html).setMimeType(ContentService.MimeType.HTML);
+      return json(result);
+    }
+    // ベストプラクティス読み込み（デバッグ用）
+    if (e && e.parameter && e.parameter.action === "getBestPractices") {
+      return json(getBestPractices());
+    }
+    // 指定月の店舗データ取得
+    if (e && e.parameter && e.parameter.action === "getStores") {
+      const ym = parseInt(e.parameter.ym) || null;
+      return json({ stores: getStores(ym) });
+    }
+    // アジェンダ外部ファイル生成（Google Docs/Slides）
+    if (e && e.parameter && e.parameter.action === "createAgendaExternal") {
+      const url = createAgendaExternal(
+        e.parameter.store || "",
+        e.parameter.format || "doc",
+        decodeURIComponent(e.parameter.memo || "")
+      );
+      return json({ ok: true, url });
     }
 
     const ss = SpreadsheetApp.openById(SS_ID);
@@ -43,7 +61,7 @@ function doGet(e) {
     }
     // 設定シートが存在しなければ自動作成
     if (!sheetNames.includes(SHEET_CONFIG)) setupConfig();
-    return json({ stores: getStores(), tasks: getTasks(), staffRanks: getStaffRanks(), staffSales: getStaffSales(), config: getConfig() });
+    return json({ stores: getStores(), availableMonths: getAvailableMonths(), tasks: getTasks(), staffRanks: getStaffRanks(), staffSales: getStaffSales(), config: getConfig() });
   } catch(err) {
     return json({ error: err.toString() });
   }
@@ -293,15 +311,36 @@ function deleteTaskRow(rowNum) {
   if (ws) ws.deleteRow(rowNum);
 }
 
+// ─ 利用可能な月一覧 ─
+function getAvailableMonths() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const rows = ss.getSheetByName(SHEET_GOAL).getDataRange().getValues();
+  const yms = new Set();
+  const today = new Date();
+  const curYM = today.getFullYear() * 100 + (today.getMonth() + 1);
+  yms.add(curYM);
+  for (let i = 1; i < rows.length; i++) {
+    const dv = Math.round(parseFloat(rows[i][3]) || 0);
+    if (dv >= 200001) yms.add(dv);
+  }
+  return Array.from(yms).sort((a,b) => b - a).slice(0, 12);
+}
+
 // ─ 店舗データ ─
-function getStores() {
+function getStores(targetYM) {
   const ss = SpreadsheetApp.openById(SS_ID);
   const rowsG = ss.getSheetByName(SHEET_GOAL).getDataRange().getValues();
   const rowsR = ss.getSheetByName(SHEET_REAL).getDataRange().getValues();
   const rowsM = ss.getSheetByName(SHEET_MIKOMI).getDataRange().getValues();
 
   const today = new Date();
-  const curYM = today.getFullYear() * 100 + (today.getMonth() + 1);
+  const curYM = targetYM || (today.getFullYear() * 100 + (today.getMonth() + 1));
+  const ymYear = Math.floor(curYM / 100);
+  const ymMonth = curYM % 100;
+  const daysInMonth = new Date(ymYear, ymMonth, 0).getDate();
+  // 過去月は月全体（満日）、当月は経過日数
+  const isCurrentMonth = curYM === (today.getFullYear() * 100 + (today.getMonth() + 1));
+  const elapsed = isCurrentMonth ? today.getDate() - 1 : daysInMonth;
 
   const actualMap = {};
   for (let i = 1; i < rowsR.length; i++) {
@@ -322,9 +361,6 @@ function getStores() {
     if (dv >= 200001 && dv !== curYM) continue;
     mikomiMap[nm] = rowsM[i];
   }
-
-  const elapsed = today.getDate() - 1;
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 
   const stores = [];
   for (let i = 1; i < rowsG.length; i++) {
@@ -550,7 +586,21 @@ function updateGoalFn(name, ym, goals) {
   addStoreFn(sv, name, ym, goals);
 }
 
-// ─ アジェンダ生成（HTML形式で返す） ─
+// ─ ベストプラクティス読み込み ─
+const BP_SS_ID = "1SW1b7hTSD0y2VbLYLN6ndFpXyhWgQrmZ3DKDNd2mexw";
+
+function getBestPractices() {
+  const ss = SpreadsheetApp.openById(BP_SS_ID);
+  const sheets = ss.getSheets();
+  const result = {};
+  sheets.forEach(ws => {
+    const rows = ws.getDataRange().getValues();
+    result[ws.getName()] = rows;
+  });
+  return result;
+}
+
+// ─ アジェンダ生成（JSONで返す） ─
 function createAgenda(storeName, format, memo) {
   const stores = getStores();
   const s = stores.find(st => st.name === storeName);
@@ -575,222 +625,369 @@ function createAgenda(storeName, format, memo) {
   const today = new Date();
   const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
   const dateStr = Utilities.formatDate(today, "Asia/Tokyo", "yyyy/MM/dd");
-  const title = storeName + " オーナーMTGアジェンダ " + ym;
   const newPct = Math.round(newRatio * 100);
 
-  const fmt = n => Math.round(n || 0).toLocaleString();
-  const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + "%" : "—";
-
-  const taskRows = storeTasks.length === 0
-    ? "<tr><td colspan='4' style='text-align:center;color:#888'>未完了タスクなし</td></tr>"
-    : storeTasks.map(t => `<tr><td>${t.category||""}</td><td>${t.taskName||""}</td><td>${t.priority||""}</td><td>${t.status||""}</td></tr>`).join("");
-
-  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>${title}</title>
-<style>
-  body{font-family:'Hiragino Kaku Gothic Pro',sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1e293b;line-height:1.6}
-  h1{font-size:22px;border-bottom:3px solid #2563eb;padding-bottom:8px;color:#1e40af}
-  h2{font-size:16px;background:#f1f5f9;padding:8px 12px;border-radius:6px;margin-top:28px}
-  table{width:100%;border-collapse:collapse;margin:8px 0}
-  th{background:#e2e8f0;padding:8px;text-align:left;font-size:13px}
-  td{padding:8px;border-bottom:1px solid #e2e8f0;font-size:13px}
-  .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-weight:700;font-size:14px;background:#dbeafe;color:#1d4ed8}
-  .meta{color:#64748b;font-size:13px;margin-bottom:20px}
-  .note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap}
-  @media print{body{margin:20px}button{display:none}}
-</style>
-</head><body>
-<div style="display:flex;justify-content:space-between;align-items:flex-start">
-  <div>
-    <h1>${title}</h1>
-    <div class="meta">担当SV: ${s.sv}　作成日: ${dateStr}</div>
-  </div>
-  <button onclick="window.print()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">🖨 印刷</button>
-</div>
-
-<h2>1. 店舗サマリー</h2>
-<table>
-  <tr><th>項目</th><th>実績</th><th>目標</th><th>達成率</th></tr>
-  <tr><td>売上</td><td>¥${fmt(s.実績売上)}</td><td>¥${fmt(s.売上目標)}</td><td>${s.達成率||0}%</td></tr>
-  <tr><td>月末見込み売上</td><td>¥${fmt(s.見込み売上)}</td><td>¥${fmt(s.売上目標)}</td><td>${s.見込み達成率||0}%</td></tr>
-  <tr><td>ロイヤリティ</td><td>¥${fmt(s.ロイヤリティ実績)}</td><td>¥${fmt(s.ロイヤリティ目標)}</td><td>${pct(s.ロイヤリティ実績,s.ロイヤリティ目標)}</td></tr>
-  <tr><td>SV売上</td><td>¥${fmt(s.SV売上実績)}</td><td>¥${fmt(s.SV売上目標)}</td><td>${pct(s.SV売上実績,s.SV売上目標)}</td></tr>
-</table>
-
-<h2>2. KPI詳細</h2>
-<table>
-  <tr><th>指標</th><th>実績</th><th>目標</th></tr>
-  <tr><td>総客数</td><td>${fmt(s.総客数実績)}人</td><td>${fmt(s.総客数目標)}人</td></tr>
-  <tr><td>新規客数</td><td>${fmt(s.新規実績)}人</td><td>${fmt(s.新規目標)}人</td></tr>
-  <tr><td>再来客数</td><td>${fmt(s.再来実績)}人</td><td>${fmt(s.再来目標)}人</td></tr>
-  <tr><td>客単価</td><td>¥${fmt(s.客単価実績)}</td><td>¥${fmt(s.客単価目標)}</td></tr>
-  <tr><td>次回予約率</td><td>${Math.round((s.次回予約率実績||0)*100)}%</td><td>—</td></tr>
-  <tr><td>回数券売上</td><td>¥${fmt(s.回数券売上実績)}</td><td>¥${fmt(s.回数券売上目標)}</td></tr>
-  <tr><td>物販売上</td><td>¥${fmt(s.物販売上実績)}</td><td>—</td></tr>
-</table>
-
-<h2>3. 顧客象限分析</h2>
-<p>現在のポジション: <span class="badge">${quadrant}</span></p>
-<p>${quadrantMsg}</p>
-<table>
-  <tr><th>指標</th><th>現状</th></tr>
-  <tr><td>新規比率</td><td>${newPct}%（再来${100-newPct}%）</td></tr>
-  <tr><td>客単価 vs 目標</td><td>${unitPrice>=unitGoal?"▲ 目標達成":"▼ 目標未達"}　¥${fmt(unitPrice)} / 目標¥${fmt(unitGoal)}</td></tr>
-</table>
-<p style="font-size:12px;color:#64748b;margin-top:8px">集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環</p>
-
-<h2>4. 改善アクション・課題</h2>
-<table>
-  <tr><th>カテゴリ</th><th>タスク名</th><th>優先度</th><th>ステータス</th></tr>
-  ${taskRows}
-</table>
-
-<h2>5. その他</h2>
-<div class="note">${memo || "（なし）"}</div>
-
-</body></html>`;
-
-  return { html, title };
+  return {
+    ok: true,
+    storeName, ym, dateStr, sv: s.sv, quadrant, quadrantMsg, newPct,
+    unitPrice: Math.round(unitPrice),
+    unitGoal: Math.round(unitGoal),
+    summary: {
+      sales: Math.round(s.実績売上 || 0), salesGoal: Math.round(s.売上目標 || 0), salesPct: s.達成率 || 0,
+      forecastSales: Math.round(s.見込み売上 || 0), forecastPct: s.見込み達成率 || 0,
+      royalty: Math.round(s.ロイヤリティ実績 || 0), royaltyGoal: Math.round(s.ロイヤリティ目標 || 0),
+      svSales: Math.round(s.SV売上実績 || 0), svSalesGoal: Math.round(s.SV売上目標 || 0),
+    },
+    kpi: {
+      total: Math.round(s.総客数実績 || 0), totalGoal: Math.round(s.総客数目標 || 0),
+      newGuest: Math.round(s.新規実績 || 0), newGoal: Math.round(s.新規目標 || 0),
+      repeat: Math.round(s.再来実績 || 0), repeatGoal: Math.round(s.再来目標 || 0),
+      unitPrice: Math.round(s.客単価実績 || 0), unitPriceGoal: Math.round(s.客単価目標 || 0),
+      nextRes: Math.round((s.次回予約率実績 || 0) * 100),
+      ticket: Math.round(s.回数券売上実績 || 0), ticketGoal: Math.round(s.回数券売上目標 || 0),
+      bussan: Math.round(s.物販売上実績 || 0),
+    },
+    tasks: storeTasks.map(t => ({category: t.category, taskName: t.taskName, priority: t.priority, status: t.status, memo: t.memo})),
+    memo,
+  };
 }
 
-function createAgendaDoc(title, s, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
+// ─ アジェンダ外部ファイル生成（Docs/Slides） ─
+function createAgendaExternal(storeName, format, memo) {
+  const today = new Date();
+  const curYM = today.getFullYear() * 100 + (today.getMonth() + 1);
+  const prevDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const prevYM = prevDate.getFullYear() * 100 + (prevDate.getMonth() + 1);
+  const prevYMStr = Utilities.formatDate(prevDate, "Asia/Tokyo", "yyyy年M月");
+
+  const stores = getStores(curYM);
+  const s = stores.find(st => st.name === storeName);
+  if (!s) throw new Error("店舗が見つかりません: " + storeName);
+
+  const prevStores = getStores(prevYM);
+  const sPrev = prevStores.find(st => st.name === storeName) || null;
+
+  const tasks = getTasks().filter(t => t.store === storeName && t.status !== "完了");
+  const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
+  const title = storeName + " オーナーMTGアジェンダ " + ym;
+  const total = (s.新規実績 || 0) + (s.再来実績 || 0);
+  const newRatio = total > 0 ? s.新規実績 / total : 0.5;
+  const unitPrice = s.客単価実績 || 0;
+  const unitGoal  = s.客単価目標 || 5000;
+  const isHighPrice = unitPrice >= unitGoal;
+  const isNewMajor  = newRatio >= 0.5;
+  let quadrant = "", quadrantMsg = "";
+  if (isHighPrice && isNewMajor)       { quadrant = "優良新規"; quadrantMsg = "高単価×新規中心。VIPへの転換を促す施策が重要。"; }
+  else if (isHighPrice && !isNewMajor) { quadrant = "VIP";      quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
+  else if (!isHighPrice && isNewMajor) { quadrant = "お試し層"; quadrantMsg = "低単価×新規中心。次回予約率向上が最優先課題。"; }
+  else                                 { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
+  if (format === "slides") {
+    return createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
+  } else {
+    return createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
+  }
+}
+
+// ─ ベストプラクティス施策取得 ─
+function getRelevantStrategies(quadrant, metrics) {
+  try {
+    const ss = SpreadsheetApp.openById(BP_SS_ID);
+    const ws = ss.getSheetByName("施策一覧表");
+    if (!ws) return [];
+    const rows = ws.getDataRange().getValues();
+    const strategies = [];
+    for (let i = 1; i < rows.length; i++) {
+      const targetQ = String(rows[i][0] || "").trim();
+      const timing  = String(rows[i][1] || "").trim();
+      // [2]=番号(空欄) [3]=施策名 [4]=施策対象 [5]=重要度
+      const name    = String(rows[i][3] || "").trim();
+      const target  = String(rows[i][4] || "").trim();
+      const imp     = String(rows[i][5] || "").trim();
+      if (!name) continue;
+      const isGlobal = targetQ === "全対象";
+      const matchQ   = isGlobal || targetQ.includes(quadrant);
+      if (!matchQ) continue;
+      let stars = (imp.match(/★/g) || []).length;
+      // メトリクスベースで優先度を上げる
+      if (metrics) {
+        if (metrics.nextRes < 0.35 && target.includes("再来")) stars += 1;
+        if (metrics.unitPrice < 5000 && target.includes("単価")) stars += 1;
+        if (metrics.newGuest < 30 && target.includes("新規")) stars += 1;
+      }
+      strategies.push({ name, target, importance: imp, stars, timing, forQuadrant: targetQ });
+    }
+    strategies.sort((a, b) => {
+      const aSpec = a.forQuadrant !== "全対象" ? 1 : 0;
+      const bSpec = b.forQuadrant !== "全対象" ? 1 : 0;
+      if (aSpec !== bSpec) return bSpec - aSpec;
+      return b.stars - a.stars;
+    });
+    return strategies.slice(0, 8);
+  } catch(e) {
+    return [];
+  }
+}
+
+function styleTableHeader(table, cols, bgColor) {
+  const row = table.getRow(0);
+  for (let c = 0; c < cols; c++) {
+    row.getCell(c).setBackgroundColor(bgColor);
+    row.getCell(c).editAsText().setBold(true).setFontSize(11);
+  }
+}
+
+function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
   const doc = DocumentApp.create(title);
   const body = doc.getBody();
   body.clear();
 
   const today = new Date();
-  const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
+  const dateStr = Utilities.formatDate(today, "Asia/Tokyo", "yyyy/MM/dd");
+  const fmt = n => Math.round(n || 0).toLocaleString();
+  const newPct = Math.round(newRatio * 100);
+  const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + "%" : "—";
 
   // タイトル
-  body.appendParagraph(title).setHeading(DocumentApp.ParagraphHeading.TITLE);
-  body.appendParagraph("作成日: " + Utilities.formatDate(today, "Asia/Tokyo", "yyyy/MM/dd")).setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  const titlePara = body.appendParagraph(title);
+  titlePara.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  titlePara.editAsText().setForegroundColor("#1e40af").setFontSize(18).setBold(true);
+  const metaPara = body.appendParagraph("担当SV: " + s.sv + "　作成日: " + dateStr + "　象限: 【" + quadrant + "】");
+  metaPara.editAsText().setFontSize(11).setForegroundColor("#64748b");
   body.appendParagraph("");
 
-  // 1. 店舗サマリー
-  body.appendParagraph("1. 店舗サマリー").setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  const table1 = body.appendTable([
-    ["項目", "実績", "目標", "達成率"],
-    ["売上", "¥" + Math.round(s.実績売上 || 0).toLocaleString(), "¥" + Math.round(s.売上目標 || 0).toLocaleString(), (s.達成率 || 0) + "%"],
-    ["月末見込み売上", "¥" + Math.round(s.見込み売上 || 0).toLocaleString(), "¥" + Math.round(s.売上目標 || 0).toLocaleString(), (s.見込み達成率 || 0) + "%"],
-    ["ロイヤリティ", "¥" + Math.round(s.ロイヤリティ実績 || 0).toLocaleString(), "¥" + Math.round(s.ロイヤリティ目標 || 0).toLocaleString(), ""],
+  const trend = (cur, prev) => {
+    if (!prev || prev === 0) return "";
+    const diff = cur - prev;
+    const pct2 = Math.round(Math.abs(diff) / prev * 100);
+    return diff > 0 ? " ▲" + pct2 + "%" : diff < 0 ? " ▼" + pct2 + "%" : " →";
+  };
+
+  // 1. 店舗サマリー（当月 vs 前月）
+  const h1 = body.appendParagraph("1. 店舗サマリー");
+  h1.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h1.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const prevLabel = sPrev ? prevYMStr + "実績" : "前月なし";
+  const t1 = body.appendTable([
+    ["項目", "当月実績", "目標", "達成率", prevLabel, "前月比"],
+    ["売上", "¥" + fmt(s.実績売上), "¥" + fmt(s.売上目標), (s.達成率 || 0) + "%",
+      sPrev ? "¥" + fmt(sPrev.実績売上) : "—", trend(s.実績売上, sPrev?.実績売上)],
+    ["月末見込み売上", "¥" + fmt(s.見込み売上), "¥" + fmt(s.売上目標), (s.見込み達成率 || 0) + "%",
+      sPrev ? "¥" + fmt(sPrev.見込み売上) : "—", ""],
+    ["ロイヤリティ", "¥" + fmt(s.ロイヤリティ実績), "¥" + fmt(s.ロイヤリティ目標), pct(s.ロイヤリティ実績, s.ロイヤリティ目標),
+      sPrev ? "¥" + fmt(sPrev.ロイヤリティ実績) : "—", trend(s.ロイヤリティ実績, sPrev?.ロイヤリティ実績)],
+    ["SV売上", "¥" + fmt(s.SV売上実績), "¥" + fmt(s.SV売上目標), pct(s.SV売上実績, s.SV売上目標),
+      sPrev ? "¥" + fmt(sPrev.SV売上実績) : "—", trend(s.SV売上実績, sPrev?.SV売上実績)],
   ]);
+  styleTableHeader(t1, 6, "#dbeafe");
   body.appendParagraph("");
 
-  // 2. KPI詳細
-  body.appendParagraph("2. KPI詳細").setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  const table2 = body.appendTable([
-    ["指標", "実績", "目標"],
-    ["総客数", (s.総客数実績 || 0) + "人", (s.総客数目標 || 0) + "人"],
-    ["新規客数", (s.新規実績 || 0) + "人", (s.新規目標 || 0) + "人"],
-    ["再来客数", (s.再来実績 || 0) + "人", (s.再来目標 || 0) + "人"],
-    ["客単価", "¥" + Math.round(s.客単価実績 || 0).toLocaleString(), "¥" + Math.round(s.客単価目標 || 0).toLocaleString()],
-    ["次回予約率", Math.round((s.次回予約率実績 || 0) * 100) + "%", "—"],
-    ["回数券売上", "¥" + Math.round(s.回数券売上実績 || 0).toLocaleString(), "¥" + Math.round(s.回数券売上目標 || 0).toLocaleString()],
-    ["物販売上", "¥" + Math.round(s.物販売上実績 || 0).toLocaleString(), "—"],
+  // 2. KPI詳細（当月 vs 前月）
+  const h2 = body.appendParagraph("2. KPI詳細");
+  h2.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h2.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
+  const nextResAlert = nextResPct < 35 ? " ⚠" : " ✓";
+  const unitAlert = unitPrice < 5020 ? " ⚠" : " ✓";
+  const t2 = body.appendTable([
+    ["指標", "当月実績", "目標", "BP基準", prevLabel, "前月比"],
+    ["総客数", fmt(s.総客数実績) + "人", fmt(s.総客数目標) + "人", "135人",
+      sPrev ? fmt(sPrev.総客数実績) + "人" : "—", trend(s.総客数実績, sPrev?.総客数実績)],
+    ["新規客数", fmt(s.新規実績) + "人", fmt(s.新規目標) + "人", "—",
+      sPrev ? fmt(sPrev.新規実績) + "人" : "—", trend(s.新規実績, sPrev?.新規実績)],
+    ["再来客数", fmt(s.再来実績) + "人", fmt(s.再来目標) + "人", "—",
+      sPrev ? fmt(sPrev.再来実績) + "人" : "—", trend(s.再来実績, sPrev?.再来実績)],
+    ["客単価", "¥" + fmt(s.客単価実績) + unitAlert, "¥" + fmt(s.客単価目標), "¥5,020",
+      sPrev ? "¥" + fmt(sPrev.客単価実績) : "—", trend(s.客単価実績, sPrev?.客単価実績)],
+    ["次回予約率", nextResPct + "%" + nextResAlert, "35%以上", "35%以上",
+      sPrev ? Math.round((sPrev.次回予約率実績||0)*100) + "%" : "—", ""],
+    ["回数券売上", "¥" + fmt(s.回数券売上実績), "¥" + fmt(s.回数券売上目標), "—",
+      sPrev ? "¥" + fmt(sPrev.回数券売上実績) : "—", trend(s.回数券売上実績, sPrev?.回数券売上実績)],
+    ["物販売上", "¥" + fmt(s.物販売上実績), "—", "¥29,700",
+      sPrev ? "¥" + fmt(sPrev.物販売上実績) : "—", trend(s.物販売上実績, sPrev?.物販売上実績)],
   ]);
+  styleTableHeader(t2, 6, "#dbeafe");
   body.appendParagraph("");
 
   // 3. 顧客象限分析
-  body.appendParagraph("3. 顧客象限分析").setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  body.appendParagraph("現在のポジション: 【" + quadrant + "】").setBold(true);
-  body.appendParagraph(quadrantMsg);
-  const newPct = Math.round(newRatio * 100);
-  const table3 = body.appendTable([
-    ["指標", "現状"],
-    ["新規比率", newPct + "% (再来" + (100 - newPct) + "%)"],
-    ["客単価 vs 目標", (unitPrice >= unitGoal ? "▲ 目標達成 " : "▼ 目標未達 ") + "¥" + Math.round(unitPrice).toLocaleString() + " / 目標¥" + Math.round(unitGoal).toLocaleString()],
-    ["フェーズ", quadrant],
-    ["推奨アクション", quadrantMsg],
+  const h3 = body.appendParagraph("3. 顧客象限分析");
+  h3.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h3.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const qPara = body.appendParagraph("現在のポジション: 【" + quadrant + "】");
+  qPara.editAsText().setFontSize(13).setBold(true).setForegroundColor("#1d4ed8");
+  body.appendParagraph(quadrantMsg).editAsText().setFontSize(11);
+  const t3 = body.appendTable([
+    ["指標", "現状", "BP基準"],
+    ["新規比率", newPct + "% (再来" + (100 - newPct) + "%)", "—"],
+    ["客単価", (unitPrice >= unitGoal ? "▲ 目標達成 " : "▼ 目標未達 ") + "¥" + fmt(unitPrice) + " / 目標¥" + fmt(unitGoal), "¥5,020"],
+    ["推奨フェーズ", quadrant, "VIP または 優良新規"],
   ]);
-  body.appendParagraph("");
-  body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環");
+  styleTableHeader(t3, 3, "#ede9fe");
+  body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環").editAsText().setFontSize(10).setForegroundColor("#64748b");
   body.appendParagraph("");
 
-  // 4. 改善アクション・課題
-  body.appendParagraph("4. 改善アクション・課題").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  // 4. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("4. 推奨アクション（ベストプラクティスより）");
+  h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h4.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
+  if (strategies.length === 0) {
+    body.appendParagraph("施策データなし");
+  } else {
+    const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
+    strategies.forEach(st => stratRows.push([st.name, st.target || "—", st.importance || "—", st.timing || "—"]));
+    const t4 = body.appendTable(stratRows);
+    styleTableHeader(t4, 4, "#fef9c3");
+  }
+  body.appendParagraph("");
+
+  // 5. 進行中タスク
+  const h5 = body.appendParagraph("5. 進行中タスク");
+  h5.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h5.editAsText().setForegroundColor("#1e40af").setBold(true);
   if (tasks.length === 0) {
     body.appendParagraph("現在の未完了タスクはありません。");
   } else {
     const taskRows = [["カテゴリ", "タスク名", "優先度", "ステータス", "メモ"]];
     tasks.forEach(t => taskRows.push([t.category || "", t.taskName || "", t.priority || "", t.status || "", t.memo || ""]));
-    body.appendTable(taskRows);
+    const t5 = body.appendTable(taskRows);
+    styleTableHeader(t5, 5, "#dcfce7");
   }
   body.appendParagraph("");
 
-  // 5. その他
-  body.appendParagraph("5. その他").setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  body.appendParagraph(memo || "（なし）");
-  body.appendParagraph("");
+  // 6. その他
+  const h6 = body.appendParagraph("6. その他");
+  h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h6.editAsText().setForegroundColor("#1e40af").setBold(true);
+  body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
 
   doc.saveAndClose();
   return doc.getUrl();
 }
 
-function createAgendaSlides(title, s, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
+function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
   const pres = SlidesApp.create(title);
-  // 既存の最初のスライドを削除して白紙から作る
-  const firstSlide = pres.getSlides()[0];
+  const BG_DARK = "#0f172a";
+  const BG_LIGHT = "#f8fafc";
+  const ACCENT = "#2563eb";
+  const fmt = n => Math.round(n || 0).toLocaleString();
+  const newPct = Math.round(newRatio * 100);
+  const dateStr = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd");
 
-  function addTextSlide(titleText, bodyText) {
-    const sl = pres.appendSlide();
-    sl.getPageElements().forEach(el => el.remove());
-    // タイトル
-    const tb1 = sl.insertTextBox(titleText, 40, 30, 880, 60);
-    tb1.getText().getTextStyle().setBold(true).setFontSize(24);
-    // 本文
-    const tb2 = sl.insertTextBox(bodyText, 40, 110, 880, 380);
-    tb2.getText().getTextStyle().setFontSize(14);
-    return sl;
+  function clearSlide(sl) { sl.getPageElements().forEach(el => el.remove()); }
+  function addBox(sl, text, x, y, w, h, fontSize, bold, color) {
+    const tb = sl.insertTextBox(text, x, y, w, h);
+    const ts = tb.getText().getTextStyle();
+    ts.setFontSize(fontSize || 14);
+    if (bold) ts.setBold(true);
+    if (color) ts.setForegroundColor(color);
+    return tb;
+  }
+  function setBg(sl, color) {
+    sl.getBackground().setSolidFill(color);
   }
 
-  // スライド1: タイトル（既存スライドを使う）
-  firstSlide.getPageElements().forEach(el => el.remove());
-  const tb = firstSlide.insertTextBox(title, 40, 200, 880, 80);
-  tb.getText().getTextStyle().setBold(true).setFontSize(28);
-  const tb2 = firstSlide.insertTextBox(
-    "担当SV: " + s.sv + "　" + Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd"),
-    40, 300, 880, 40
-  );
-  tb2.getText().getTextStyle().setFontSize(16);
+  // スライド1: タイトル
+  const sl1 = pres.getSlides()[0];
+  clearSlide(sl1);
+  setBg(sl1, BG_DARK);
+  addBox(sl1, title, 40, 140, 880, 100, 26, true, "#ffffff");
+  addBox(sl1, "担当SV: " + s.sv + "　" + dateStr + "　象限:【" + quadrant + "】", 40, 260, 880, 40, 16, false, "#94a3b8");
+  addBox(sl1, quadrantMsg, 40, 310, 880, 50, 13, false, "#60a5fa");
+
+  const tr = (cur, prev) => {
+    if (!prev || prev === 0) return "";
+    const d = cur - prev;
+    const p = Math.round(Math.abs(d) / prev * 100);
+    return d > 0 ? "  ▲" + p + "%" : d < 0 ? "  ▼" + p + "%" : "  →";
+  };
+  const prevL = sPrev ? prevYMStr : "";
 
   // スライド2: 店舗サマリー
-  const newPct = Math.round(newRatio * 100);
-  addTextSlide("1. 店舗サマリー",
-    "売上実績: ¥" + Math.round(s.実績売上 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.売上目標 || 0).toLocaleString() + " (" + (s.達成率 || 0) + "%)\n" +
-    "月末見込み: ¥" + Math.round(s.見込み売上 || 0).toLocaleString() + " (" + (s.見込み達成率 || 0) + "%)\n" +
-    "ロイヤリティ: ¥" + Math.round(s.ロイヤリティ実績 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.ロイヤリティ目標 || 0).toLocaleString()
-  );
+  const sl2 = pres.appendSlide();
+  clearSlide(sl2);
+  setBg(sl2, BG_LIGHT);
+  addBox(sl2, "1. 店舗サマリー", 40, 20, 500, 45, 20, true, ACCENT);
+  if (prevL) addBox(sl2, "前月: " + prevL, 550, 20, 380, 40, 12, false, "#64748b");
+  const salesPct = s.達成率 || 0;
+  const mkPct = s.見込み達成率 || 0;
+  addBox(sl2,
+    "売上実績:　¥" + fmt(s.実績売上) + "  /  目標 ¥" + fmt(s.売上目標) + "  →  " + salesPct + "%" +
+      (sPrev ? tr(s.実績売上, sPrev.実績売上) + "　（前月: ¥" + fmt(sPrev.実績売上) + " " + (sPrev.達成率||0) + "%）" : "") + "\n" +
+    "月末見込み:　¥" + fmt(s.見込み売上) + "  →  " + mkPct + "%" + "\n" +
+    "ロイヤリティ:　¥" + fmt(s.ロイヤリティ実績) + "  /  目標 ¥" + fmt(s.ロイヤリティ目標) +
+      (sPrev ? tr(s.ロイヤリティ実績, sPrev.ロイヤリティ実績) + "　（前月: ¥" + fmt(sPrev.ロイヤリティ実績) + "）" : "") + "\n" +
+    "SV売上:　¥" + fmt(s.SV売上実績) + "  /  目標 ¥" + fmt(s.SV売上目標) +
+      (sPrev ? tr(s.SV売上実績, sPrev.SV売上実績) + "　（前月: ¥" + fmt(sPrev.SV売上実績) + "）" : ""),
+    40, 80, 880, 230, 14, false, "#1e293b");
 
   // スライド3: KPI詳細
-  addTextSlide("2. KPI詳細",
-    "総客数: " + (s.総客数実績 || 0) + "人 / 目標 " + (s.総客数目標 || 0) + "人\n" +
-    "新規: " + (s.新規実績 || 0) + "人 / 再来: " + (s.再来実績 || 0) + "人\n" +
-    "客単価: ¥" + Math.round(s.客単価実績 || 0).toLocaleString() + " / 目標 ¥" + Math.round(s.客単価目標 || 0).toLocaleString() + "\n" +
-    "次回予約率: " + Math.round((s.次回予約率実績 || 0) * 100) + "%\n" +
-    "回数券売上: ¥" + Math.round(s.回数券売上実績 || 0).toLocaleString() + "\n" +
-    "物販売上: ¥" + Math.round(s.物販売上実績 || 0).toLocaleString()
-  );
+  const sl3 = pres.appendSlide();
+  clearSlide(sl3);
+  setBg(sl3, BG_LIGHT);
+  addBox(sl3, "2. KPI詳細", 40, 20, 500, 45, 20, true, ACCENT);
+  if (prevL) addBox(sl3, "前月: " + prevL, 550, 20, 380, 40, 12, false, "#64748b");
+  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
+  const prevNextRes = sPrev ? Math.round((sPrev.次回予約率実績||0)*100) : null;
+  addBox(sl3,
+    "総客数:　" + fmt(s.総客数実績) + "人" + (sPrev ? tr(s.総客数実績, sPrev.総客数実績) + "（前月:" + fmt(sPrev.総客数実績) + "人）" : "") + "  /  目標 " + fmt(s.総客数目標) + "人　BP:135人\n" +
+    "新規:　" + fmt(s.新規実績) + "人" + (sPrev ? "（前月:" + fmt(sPrev.新規実績) + "人）" : "") + "  /  再来: " + fmt(s.再来実績) + "人" + (sPrev ? "（前月:" + fmt(sPrev.再来実績) + "人）" : "") + "\n" +
+    "客単価:　¥" + fmt(s.客単価実績) + (sPrev ? tr(s.客単価実績, sPrev.客単価実績) + "（前月:¥" + fmt(sPrev.客単価実績) + "）" : "") + "  /  目標 ¥" + fmt(s.客単価目標) + "　BP:¥5,020" + (unitPrice < 5020 ? " ⚠" : " ✓") + "\n" +
+    "次回予約率:　" + nextResPct + "%" + (prevNextRes !== null ? "（前月:" + prevNextRes + "%）" : "") + "　BP:35%以上" + (nextResPct < 35 ? " ⚠" : " ✓") + "\n" +
+    "回数券売上:　¥" + fmt(s.回数券売上実績) + (sPrev ? tr(s.回数券売上実績, sPrev.回数券売上実績) + "（前月:¥" + fmt(sPrev.回数券売上実績) + "）" : "") + "\n" +
+    "物販売上:　¥" + fmt(s.物販売上実績) + (sPrev ? tr(s.物販売上実績, sPrev.物販売上実績) + "（前月:¥" + fmt(sPrev.物販売上実績) + "）" : "") + "　BP:¥29,700",
+    40, 80, 880, 300, 13, false, "#1e293b");
 
   // スライド4: 顧客象限
-  addTextSlide("3. 顧客象限分析",
-    "現在のポジション: 【" + quadrant + "】\n\n" +
-    quadrantMsg + "\n\n" +
+  const sl4 = pres.appendSlide();
+  clearSlide(sl4);
+  setBg(sl4, BG_DARK);
+  addBox(sl4, "3. 顧客象限分析", 40, 20, 880, 45, 20, true, "#60a5fa");
+  addBox(sl4, "現在のポジション: 【" + quadrant + "】", 40, 80, 880, 50, 22, true, "#fbbf24");
+  addBox(sl4, quadrantMsg, 40, 145, 880, 50, 14, false, "#e2e8f0");
+  addBox(sl4,
     "新規比率: " + newPct + "% / 再来: " + (100 - newPct) + "%\n" +
-    "客単価: ¥" + Math.round(unitPrice).toLocaleString() + " (目標比: " + (unitPrice >= unitGoal ? "▲ 達成" : "▼ 未達") + ")\n\n" +
-    "サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環"
-  );
+    "客単価: ¥" + fmt(unitPrice) + "  （目標比: " + (unitPrice >= unitGoal ? "▲ 達成" : "▼ 未達") + "）\n\n" +
+    "集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環",
+    40, 210, 880, 180, 14, false, "#94a3b8");
 
-  // スライド5: 改善アクション
+  // スライド5: 推奨アクション（BP）
+  const sl5 = pres.appendSlide();
+  clearSlide(sl5);
+  setBg(sl5, BG_LIGHT);
+  addBox(sl5, "4. 推奨アクション（ベストプラクティスより）", 40, 20, 880, 45, 18, true, ACCENT);
+  const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
+  const stratText = strategies.length === 0 ? "施策データなし" :
+    strategies.slice(0, 6).map((st, i) => (i+1) + ". 【" + (st.importance||"") + "】" + st.name + "（" + (st.target||"—") + "）").join("\n");
+  addBox(sl5, stratText, 40, 80, 880, 380, 13, false, "#1e293b");
+
+  // スライド6: 進行中タスク
+  const sl6 = pres.appendSlide();
+  clearSlide(sl6);
+  setBg(sl6, BG_LIGHT);
+  addBox(sl6, "5. 進行中タスク", 40, 20, 880, 45, 18, true, ACCENT);
   const taskText = tasks.length === 0
     ? "現在の未完了タスクはありません。"
-    : tasks.map(t => "【" + (t.priority || "") + "】[" + (t.category || "") + "] " + t.taskName + (t.memo ? " (" + t.memo + ")" : "")).join("\n");
-  addTextSlide("4. 改善アクション・課題", taskText);
+    : tasks.map(t => "【" + (t.priority||"") + "】[" + (t.category||"") + "] " + t.taskName + (t.memo ? "  →  " + t.memo : "")).join("\n");
+  addBox(sl6, taskText, 40, 80, 880, 380, 13, false, "#1e293b");
 
-  // スライド6: その他
-  addTextSlide("5. その他", memo || "（なし）");
+  // スライド7: その他
+  const sl7 = pres.appendSlide();
+  clearSlide(sl7);
+  setBg(sl7, BG_DARK);
+  addBox(sl7, "6. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
+  addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
 
   pres.saveAndClose();
   return pres.getUrl();
+}
+
+// ─ 権限認証用（GASエディタで1回だけ実行する） ─
+function authorizeDocAccess() {
+  const doc = DocumentApp.create("_権限テスト_削除してください");
+  doc.saveAndClose();
+  const pres = SlidesApp.create("_権限テスト_削除してください");
+  pres.saveAndClose();
+  Logger.log("認証完了。Googleドライブに「_権限テスト_削除してください」が2件できているので手動で削除してください。");
 }
 
 function json(data) {

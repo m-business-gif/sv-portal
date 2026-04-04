@@ -416,7 +416,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
         <button class="vtb on" onclick="setMode('all',this)">全体</button>
         <button class="vtb" onclick="setMode('mine',this)">マイ担当</button>
       </div>
-      <div class="vtog" id="month-tog"></div>
+      <select class="sel" id="month-sel" onchange="selectMonth(this.value)"></select>
       <button class="icon-btn" onclick="loadData()" title="更新">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
       </button>
@@ -433,16 +433,19 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbxt6QMjP7kjZRbfsOOojUgs6L7n6oqMkZht5MLMFAssPBlBPv-61iPYQ-yIPo-KxILJ/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbwMsN3EtGhd_TQRdHnxC5AcJSJWza3IGN9JWDJqmrraK-shAHUoM2qogJTY14QIncpm/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
 let API_URL=localStorage.getItem("gas_url")||DEFAULT_API_URL;
 let mySV=localStorage.getItem("my_sv")||"";
 let mode="all";
-let stores=[],tasks=[],staffRanks=[],staffSales=[],prevStores=[],prevYMLabel="";
+let stores=[],tasks=[],staffRanks=[],staffSales=[];
+let storesByYM={};
+let selectedYM=0;
+let curYM=0;
+let availableMonths=[];
 let curView="stores";
-let monthView="cur";
 
 window.addEventListener("DOMContentLoaded",()=>{
   if(!mySV){mySV=prompt("SV名を入力（例: 山田、髙橋、向井、子龍、宮脇）")||"SV";localStorage.setItem("my_sv",mySV);}
@@ -515,13 +518,18 @@ async function loadData(){
     const res=await fetch(API_URL);
     const data=await res.json();
     if(data.error)throw new Error(data.error);
-    stores=data.stores||[];tasks=data.tasks||[];staffRanks=data.staffRanks||[];staffSales=data.staffSales||[];prevStores=data.prevStores||[];prevYMLabel=data.prevYMLabel||"";
+    stores=data.stores||[];tasks=data.tasks||[];staffRanks=data.staffRanks||[];staffSales=data.staffSales||[];
+    availableMonths=data.availableMonths||[];
+    const now=new Date();
+    curYM=now.getFullYear()*100+(now.getMonth()+1);
+    if(!selectedYM||selectedYM===curYM){selectedYM=curYM;}
+    storesByYM[curYM]=stores;
     if(data.config){
       if(data.config.svList&&data.config.svList.length){SVC={};data.config.svList.forEach(s=>{SVC[s.name]=s.color;});}
       if(data.config.taskCats&&data.config.taskCats.length){TASK_CATS=data.config.taskCats;}
     }
     setSyncStatus("ok");
-    updateMonthToggle();initSelects();render();
+    buildMonthSelect();initSelects();render();
   }catch(e){
     setSyncStatus("err");
     const g=document.getElementById("grid");
@@ -548,12 +556,25 @@ function initSelects(){
 
 function render(){renderSum();renderCards();renderMikomi();renderTasks();renderSVTable();updateAlertBadge();}
 
-function getStores(){const base=monthView==="prev"?prevStores:stores;return mode==="mine"?base.filter(s=>s.sv===mySV):base;}
-function switchMonth(v){monthView=v;document.querySelectorAll(".mtb").forEach(b=>b.classList.toggle("on",b.dataset.m===v));render();}
-function updateMonthToggle(){
-  const curLabel=(new Date().getMonth()+1)+"月";
-  const el=document.getElementById("month-tog");
-  if(el)el.innerHTML=`<button class="vtb mtb on" data-m="cur" onclick="switchMonth('cur')">${curLabel}</button><button class="vtb mtb" data-m="prev" onclick="switchMonth('prev')">${prevYMLabel||"前月"}</button>`;
+function getStores(){const base=storesByYM[selectedYM]||stores;return mode==="mine"?base.filter(s=>s.sv===mySV):base;}
+function ymLabel(ym){const y=Math.floor(ym/100);const m=ym%100;return y+"年"+m+"月";}
+function buildMonthSelect(){
+  const el=document.getElementById("month-sel");if(!el)return;
+  const months=availableMonths.length?availableMonths:[curYM];
+  el.innerHTML=months.map(ym=>`<option value="${ym}"${ym===selectedYM?" selected":""}>${ymLabel(ym)}</option>`).join("");
+}
+async function selectMonth(ym){
+  ym=parseInt(ym);
+  selectedYM=ym;
+  if(storesByYM[ym]){render();return;}
+  setSyncStatus("loading");
+  try{
+    const res=await fetch(API_URL+"?action=getStores&ym="+ym);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    storesByYM[ym]=data.stores||[];
+    setSyncStatus("ok");render();
+  }catch(e){setSyncStatus("err");alert("データ取得失敗: "+e.message);}
 }
 
 // ─ SUMMARY ─
