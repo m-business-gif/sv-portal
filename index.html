@@ -1072,10 +1072,22 @@ async function generateAgenda(storeName){
     const res=await fetch(url);
     const html=await res.text();
     document.getElementById("agenda-loading")?.remove();
+    // ポータル内のiframeモーダルで表示
     const blob=new Blob([html],{type:"text/html;charset=utf-8"});
     const blobUrl=URL.createObjectURL(blob);
-    const w=window.open(blobUrl,"_blank");
-    if(!w)alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してください。");
+    const overlay=document.createElement("div");
+    overlay.id="agenda-view";
+    overlay.style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;flex-direction:column";
+    overlay.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1e293b">
+        <span style="color:#fff;font-weight:700;font-size:14px">📋 ${storeName} アジェンダ</span>
+        <div style="display:flex;gap:8px">
+          <a href="${blobUrl}" download="${storeName}_アジェンダ.html" style="padding:6px 14px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-size:13px">⬇ 保存</a>
+          <button onclick="document.getElementById('agenda-view').remove()" style="padding:6px 14px;background:#475569;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">✕ 閉じる</button>
+        </div>
+      </div>
+      <iframe src="${blobUrl}" style="flex:1;border:none;background:#fff"></iframe>`;
+    document.body.appendChild(overlay);
   }catch(e){
     document.getElementById("agenda-loading")?.remove();
     alert("エラー: "+e.message);
