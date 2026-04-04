@@ -1068,17 +1068,12 @@ async function generateAgenda(storeName){
   loadEl.innerHTML=`<div style="background:var(--sur);padding:24px 32px;border-radius:12px;text-align:center;color:var(--ink)"><div style="font-size:24px;margin-bottom:8px">⏳</div><div>アジェンダを生成中...</div></div>`;
   document.body.appendChild(loadEl);
   try{
-    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action:"createAgenda",store:storeName,format:fmt,memo})});
-    const j=await res.json();
     document.getElementById("agenda-loading")?.remove();
-    if(j.ok&&j.html){
-      const w=window.open("","_blank");
-      w.document.write(j.html);
-      w.document.close();
-    } else alert("生成失敗: "+(j.error||""));
+    const url=API_URL+"?action=createAgenda&store="+encodeURIComponent(storeName)+"&format="+fmt+"&memo="+encodeURIComponent(memo);
+    window.open(url,"_blank");
   }catch(e){
     document.getElementById("agenda-loading")?.remove();
-    alert("通信エラー: "+e.message);
+    alert("エラー: "+e.message);
   }
 }
 

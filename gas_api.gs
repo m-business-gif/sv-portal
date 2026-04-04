@@ -16,6 +16,16 @@ const SHEET_CONFIG = "【眉毛】加盟店管理集計";
 
 function doGet(e) {
   try {
+    // アジェンダ生成リクエスト
+    if (e && e.parameter && e.parameter.action === "createAgenda") {
+      const result = createAgenda(
+        e.parameter.store || "",
+        e.parameter.format || "doc",
+        decodeURIComponent(e.parameter.memo || "")
+      );
+      return ContentService.createTextOutput(result.html).setMimeType(ContentService.MimeType.HTML);
+    }
+
     const ss = SpreadsheetApp.openById(SS_ID);
     const sheetNames = ss.getSheets().map(s => s.getName());
     const required = [SHEET_GOAL, SHEET_REAL, SHEET_MIKOMI];
