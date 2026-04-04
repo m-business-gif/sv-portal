@@ -416,6 +416,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
         <button class="vtb on" onclick="setMode('all',this)">全体</button>
         <button class="vtb" onclick="setMode('mine',this)">マイ担当</button>
       </div>
+      <div class="vtog" id="month-tog"></div>
       <button class="icon-btn" onclick="loadData()" title="更新">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
       </button>
@@ -441,6 +442,7 @@ let mySV=localStorage.getItem("my_sv")||"";
 let mode="all";
 let stores=[],tasks=[],staffRanks=[],staffSales=[],prevStores=[],prevYMLabel="";
 let curView="stores";
+let monthView="cur";
 
 window.addEventListener("DOMContentLoaded",()=>{
   if(!mySV){mySV=prompt("SV名を入力（例: 山田、髙橋、向井、子龍、宮脇）")||"SV";localStorage.setItem("my_sv",mySV);}
@@ -519,7 +521,7 @@ async function loadData(){
       if(data.config.taskCats&&data.config.taskCats.length){TASK_CATS=data.config.taskCats;}
     }
     setSyncStatus("ok");
-    initSelects();render();
+    updateMonthToggle();initSelects();render();
   }catch(e){
     setSyncStatus("err");
     const g=document.getElementById("grid");
@@ -546,7 +548,13 @@ function initSelects(){
 
 function render(){renderSum();renderCards();renderMikomi();renderTasks();renderSVTable();updateAlertBadge();}
 
-function getStores(){return mode==="mine"?stores.filter(s=>s.sv===mySV):stores;}
+function getStores(){const base=monthView==="prev"?prevStores:stores;return mode==="mine"?base.filter(s=>s.sv===mySV):base;}
+function switchMonth(v){monthView=v;document.querySelectorAll(".mtb").forEach(b=>b.classList.toggle("on",b.dataset.m===v));render();}
+function updateMonthToggle(){
+  const curLabel=(new Date().getMonth()+1)+"月";
+  const el=document.getElementById("month-tog");
+  if(el)el.innerHTML=`<button class="vtb mtb on" data-m="cur" onclick="switchMonth('cur')">${curLabel}</button><button class="vtb mtb" data-m="prev" onclick="switchMonth('prev')">${prevYMLabel||"前月"}</button>`;
+}
 
 // ─ SUMMARY ─
 function renderSum(){
@@ -601,8 +609,6 @@ function storeCard(s,i){
   const id="s"+i;
   const mp=pcc(s.見込み達成率||0);
   const vp=s.総客数目標>0?Math.min(Math.round(s.総客数実績/s.総客数目標*100),999):null;
-  const prev=prevStores.find(ps=>ps.name===s.name);
-  const tr=(cur,pre)=>{if(!pre||pre===0)return "";const d=cur-pre;const pct=Math.round(Math.abs(d)/pre*100);return d>0?`<span style="color:var(--grn);font-size:10px">▲${pct}%</span>`:d<0?`<span style="color:var(--red);font-size:10px">▼${pct}%</span>`:`<span style="color:var(--ink3);font-size:10px">→</span>`;};
 
   return `<div class="card" id="card-${id}">
   <div class="c-head">
@@ -617,8 +623,8 @@ function storeCard(s,i){
   </div>
   <div class="c-kpi">
     <div class="kpi-row">
-      <div class="ki"><div class="ki-l">売上実績</div><div class="ki-v" style="color:${pc}">¥${fk(s.実績売上)}</div><div class="ki-s">目標 ¥${fk(s.売上目標)}${prev?` / <span style="color:var(--ink3)">${prevYMLabel} ¥${fk(prev.実績売上)}</span> ${tr(s.実績売上,prev.実績売上)}`:""}</div></div>
-      <div class="ki"><div class="ki-l">総客数</div><div class="ki-v">${s.総客数実績}<span style="font-size:11px;color:var(--ink3)">人</span></div><div class="ki-s">目標 ${s.総客数目標}人${prev?` / <span style="color:var(--ink3)">${prevYMLabel} ${prev.総客数実績}人</span> ${tr(s.総客数実績,prev.総客数実績)}`:""}</div></div>
+      <div class="ki"><div class="ki-l">売上実績</div><div class="ki-v" style="color:${pc}">¥${fk(s.実績売上)}</div><div class="ki-s">目標 ¥${fk(s.売上目標)}</div></div>
+      <div class="ki"><div class="ki-l">総客数</div><div class="ki-v">${s.総客数実績}<span style="font-size:11px;color:var(--ink3)">人</span></div><div class="ki-s">目標 ${s.総客数目標}人</div></div>
       <div class="ki"><div class="ki-l">客単価</div><div class="ki-v">${s.客単価実績?Math.round(s.客単価実績).toLocaleString():"—"}<span style="font-size:10px;color:var(--ink3)">円</span></div><div class="ki-s">目標 ${s.客単価目標>0?Math.round(s.客単価目標).toLocaleString():"—"}円</div></div>
     </div>
     <div class="prog"><div class="prog-f" style="width:${Math.min(p,100)}%;background:${pc}"></div></div>
