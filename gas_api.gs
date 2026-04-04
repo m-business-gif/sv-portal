@@ -61,7 +61,15 @@ function doGet(e) {
     }
     // 設定シートが存在しなければ自動作成
     if (!sheetNames.includes(SHEET_CONFIG)) setupConfig();
-    return json({ stores: getStores(), availableMonths: getAvailableMonths(), tasks: getTasks(), staffRanks: getStaffRanks(), staffSales: getStaffSales(), config: getConfig() });
+    const safe = fn => { try { return fn(); } catch(e) { Logger.log("doGet error: " + e); return null; } };
+    return json({
+      stores:          safe(getStores) || [],
+      availableMonths: safe(getAvailableMonths) || [],
+      tasks:           safe(getTasks) || [],
+      staffRanks:      safe(getStaffRanks) || [],
+      staffSales:      safe(getStaffSales) || [],
+      config:          safe(getConfig) || {}
+    });
   } catch(err) {
     return json({ error: err.toString() });
   }
@@ -313,17 +321,24 @@ function deleteTaskRow(rowNum) {
 
 // ─ 利用可能な月一覧 ─
 function getAvailableMonths() {
-  const ss = SpreadsheetApp.openById(SS_ID);
-  const rows = ss.getSheetByName(SHEET_GOAL).getDataRange().getValues();
-  const yms = new Set();
-  const today = new Date();
-  const curYM = today.getFullYear() * 100 + (today.getMonth() + 1);
-  yms.add(curYM);
-  for (let i = 1; i < rows.length; i++) {
-    const dv = Math.round(parseFloat(rows[i][3]) || 0);
-    if (dv >= 200001) yms.add(dv);
+  try {
+    const ss = SpreadsheetApp.openById(SS_ID);
+    const ws = ss.getSheetByName(SHEET_GOAL);
+    if (!ws) return [];
+    const rows = ws.getDataRange().getValues();
+    const yms = new Set();
+    const today = new Date();
+    const curYM = today.getFullYear() * 100 + (today.getMonth() + 1);
+    yms.add(curYM);
+    for (let i = 1; i < rows.length; i++) {
+      const dv = Math.round(parseFloat(rows[i][3]) || 0);
+      if (dv >= 200001) yms.add(dv);
+    }
+    return Array.from(yms).sort((a,b) => b - a).slice(0, 12);
+  } catch(e) {
+    Logger.log("getAvailableMonths error: " + e);
+    return [];
   }
-  return Array.from(yms).sort((a,b) => b - a).slice(0, 12);
 }
 
 // ─ 店舗データ ─
