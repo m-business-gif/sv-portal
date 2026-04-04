@@ -432,7 +432,11 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-let API_URL=localStorage.getItem("gas_url")||"https://script.google.com/macros/s/AKfycbwYZtQv8RostEc10bQKOmxKmAq4jMEM1x3Qf0Wqd888MV__21ndF90Pq_8SxGCLCClR/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbwYZtQv8RostEc10bQKOmxKmAq4jMEM1x3Qf0Wqd888MV__21ndF90Pq_8SxGCLCClR/exec";
+const stored_url=localStorage.getItem("gas_url");
+// 古いURLが保存されていたら自動でリセット
+if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
+let API_URL=localStorage.getItem("gas_url")||DEFAULT_API_URL;
 let mySV=localStorage.getItem("my_sv")||"";
 let mode="all";
 let stores=[],tasks=[],staffRanks=[],staffSales=[];
