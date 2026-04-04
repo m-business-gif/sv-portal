@@ -1068,9 +1068,13 @@ async function generateAgenda(storeName){
   loadEl.innerHTML=`<div style="background:var(--sur);padding:24px 32px;border-radius:12px;text-align:center;color:var(--ink)"><div style="font-size:24px;margin-bottom:8px">⏳</div><div>アジェンダを生成中...</div></div>`;
   document.body.appendChild(loadEl);
   try{
-    document.getElementById("agenda-loading")?.remove();
     const url=API_URL+"?action=createAgenda&store="+encodeURIComponent(storeName)+"&format="+fmt+"&memo="+encodeURIComponent(memo);
-    window.open(url,"_blank");
+    const res=await fetch(url);
+    const html=await res.text();
+    document.getElementById("agenda-loading")?.remove();
+    const w=window.open("","_blank");
+    if(w){w.document.write(html);w.document.close();}
+    else alert("ポップアップがブロックされています。ブラウザの設定でこのサイトのポップアップを許可してください。");
   }catch(e){
     document.getElementById("agenda-loading")?.remove();
     alert("エラー: "+e.message);
