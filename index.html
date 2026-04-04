@@ -432,14 +432,14 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbw0HXuIGxLAMO__6FiiY-Sy3eokiQjzYmsKUAIDR3ShC0vKE7rlBCdUDqh7L6Li4eP0/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbxt6QMjP7kjZRbfsOOojUgs6L7n6oqMkZht5MLMFAssPBlBPv-61iPYQ-yIPo-KxILJ/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
 let API_URL=localStorage.getItem("gas_url")||DEFAULT_API_URL;
 let mySV=localStorage.getItem("my_sv")||"";
 let mode="all";
-let stores=[],tasks=[],staffRanks=[],staffSales=[];
+let stores=[],tasks=[],staffRanks=[],staffSales=[],prevStores=[],prevYMLabel="";
 let curView="stores";
 
 window.addEventListener("DOMContentLoaded",()=>{
@@ -513,7 +513,7 @@ async function loadData(){
     const res=await fetch(API_URL);
     const data=await res.json();
     if(data.error)throw new Error(data.error);
-    stores=data.stores||[];tasks=data.tasks||[];staffRanks=data.staffRanks||[];staffSales=data.staffSales||[];
+    stores=data.stores||[];tasks=data.tasks||[];staffRanks=data.staffRanks||[];staffSales=data.staffSales||[];prevStores=data.prevStores||[];prevYMLabel=data.prevYMLabel||"";
     if(data.config){
       if(data.config.svList&&data.config.svList.length){SVC={};data.config.svList.forEach(s=>{SVC[s.name]=s.color;});}
       if(data.config.taskCats&&data.config.taskCats.length){TASK_CATS=data.config.taskCats;}
@@ -601,6 +601,8 @@ function storeCard(s,i){
   const id="s"+i;
   const mp=pcc(s.見込み達成率||0);
   const vp=s.総客数目標>0?Math.min(Math.round(s.総客数実績/s.総客数目標*100),999):null;
+  const prev=prevStores.find(ps=>ps.name===s.name);
+  const tr=(cur,pre)=>{if(!pre||pre===0)return "";const d=cur-pre;const pct=Math.round(Math.abs(d)/pre*100);return d>0?`<span style="color:var(--grn);font-size:10px">▲${pct}%</span>`:d<0?`<span style="color:var(--red);font-size:10px">▼${pct}%</span>`:`<span style="color:var(--ink3);font-size:10px">→</span>`;};
 
   return `<div class="card" id="card-${id}">
   <div class="c-head">
@@ -615,8 +617,8 @@ function storeCard(s,i){
   </div>
   <div class="c-kpi">
     <div class="kpi-row">
-      <div class="ki"><div class="ki-l">売上実績</div><div class="ki-v" style="color:${pc}">¥${fk(s.実績売上)}</div><div class="ki-s">目標 ¥${fk(s.売上目標)}</div></div>
-      <div class="ki"><div class="ki-l">総客数</div><div class="ki-v">${s.総客数実績}<span style="font-size:11px;color:var(--ink3)">人</span></div><div class="ki-s">目標 ${s.総客数目標}人</div></div>
+      <div class="ki"><div class="ki-l">売上実績</div><div class="ki-v" style="color:${pc}">¥${fk(s.実績売上)}</div><div class="ki-s">目標 ¥${fk(s.売上目標)}${prev?` / <span style="color:var(--ink3)">${prevYMLabel} ¥${fk(prev.実績売上)}</span> ${tr(s.実績売上,prev.実績売上)}`:""}</div></div>
+      <div class="ki"><div class="ki-l">総客数</div><div class="ki-v">${s.総客数実績}<span style="font-size:11px;color:var(--ink3)">人</span></div><div class="ki-s">目標 ${s.総客数目標}人${prev?` / <span style="color:var(--ink3)">${prevYMLabel} ${prev.総客数実績}人</span> ${tr(s.総客数実績,prev.総客数実績)}`:""}</div></div>
       <div class="ki"><div class="ki-l">客単価</div><div class="ki-v">${s.客単価実績?Math.round(s.客単価実績).toLocaleString():"—"}<span style="font-size:10px;color:var(--ink3)">円</span></div><div class="ki-s">目標 ${s.客単価目標>0?Math.round(s.客単価目標).toLocaleString():"—"}円</div></div>
     </div>
     <div class="prog"><div class="prog-f" style="width:${Math.min(p,100)}%;background:${pc}"></div></div>
