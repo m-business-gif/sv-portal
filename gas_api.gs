@@ -773,10 +773,6 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
       sPrev ? "¥" + fmt(sPrev.実績売上) : "—", trend(s.実績売上, sPrev?.実績売上)],
     ["月末見込み売上", "¥" + fmt(s.見込み売上), "¥" + fmt(s.売上目標), (s.見込み達成率 || 0) + "%",
       sPrev ? "¥" + fmt(sPrev.見込み売上) : "—", ""],
-    ["ロイヤリティ", "¥" + fmt(s.ロイヤリティ実績), "¥" + fmt(s.ロイヤリティ目標), pct(s.ロイヤリティ実績, s.ロイヤリティ目標),
-      sPrev ? "¥" + fmt(sPrev.ロイヤリティ実績) : "—", trend(s.ロイヤリティ実績, sPrev?.ロイヤリティ実績)],
-    ["SV売上", "¥" + fmt(s.SV売上実績), "¥" + fmt(s.SV売上目標), pct(s.SV売上実績, s.SV売上目標),
-      sPrev ? "¥" + fmt(sPrev.SV売上実績) : "—", trend(s.SV売上実績, sPrev?.SV売上実績)],
   ]);
   styleTableHeader(t1, 6, "#dbeafe");
   body.appendParagraph("");
@@ -913,11 +909,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   addBox(sl2,
     "売上実績:　¥" + fmt(s.実績売上) + "  /  目標 ¥" + fmt(s.売上目標) + "  →  " + salesPct + "%" +
       (sPrev ? tr(s.実績売上, sPrev.実績売上) + "　（前月: ¥" + fmt(sPrev.実績売上) + " " + (sPrev.達成率||0) + "%）" : "") + "\n" +
-    "月末見込み:　¥" + fmt(s.見込み売上) + "  →  " + mkPct + "%" + "\n" +
-    "ロイヤリティ:　¥" + fmt(s.ロイヤリティ実績) + "  /  目標 ¥" + fmt(s.ロイヤリティ目標) +
-      (sPrev ? tr(s.ロイヤリティ実績, sPrev.ロイヤリティ実績) + "　（前月: ¥" + fmt(sPrev.ロイヤリティ実績) + "）" : "") + "\n" +
-    "SV売上:　¥" + fmt(s.SV売上実績) + "  /  目標 ¥" + fmt(s.SV売上目標) +
-      (sPrev ? tr(s.SV売上実績, sPrev.SV売上実績) + "　（前月: ¥" + fmt(sPrev.SV売上実績) + "）" : ""),
+    "月末見込み:　¥" + fmt(s.見込み売上) + "  →  " + mkPct + "%",
     40, 80, 880, 230, 14, false, "#1e293b");
 
   // スライド3: KPI詳細
