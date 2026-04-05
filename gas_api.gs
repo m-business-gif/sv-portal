@@ -1132,13 +1132,18 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   function addTable(sl, rows, left, top, width, height, headerColor, fs) {
     const nr = rows.length, nc = rows[0].length;
     const tbl = sl.insertTable(nr, nc, left, top, width, height);
-    rows.forEach((row, r) => {
-      row.forEach((txt, c) => {
-        const cell = tbl.getCell(r, c);
-        cell.getText().setText(String(txt != null ? txt : ""));
-        const ts = cell.getText().getTextStyle();
-        ts.setFontSize(fs || 10);
-        if (r === 0) { cell.getFill().setSolidFill(headerColor || "#dbeafe"); ts.setBold(true); }
+    rows.forEach((row, ri) => {
+      row.forEach((txt, ci) => {
+        const cell = tbl.getCell(ri, ci);
+        const cellText = cell.getText();
+        const content = String(txt != null ? txt : "");
+        cellText.setText(content || " ");
+        try {
+          const ts = cellText.getTextStyle();
+          ts.setFontSize(fs || 10);
+          if (ri === 0) ts.setBold(true);
+        } catch(e) {}
+        if (ri === 0) cell.getFill().setSolidFill(headerColor || "#dbeafe");
       });
     });
     return tbl;
