@@ -1006,22 +1006,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 5. 進行中タスク
-  const h5 = body.appendParagraph("5. 進行中タスク");
-  h5.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  h5.editAsText().setForegroundColor("#1e40af").setBold(true);
-  if (tasks.length === 0) {
-    body.appendParagraph("現在の未完了タスクはありません。");
-  } else {
-    const taskRows = [["カテゴリ", "タスク名", "優先度", "ステータス", "メモ"]];
-    tasks.forEach(t => taskRows.push([t.category || "", t.taskName || "", t.priority || "", t.status || "", t.memo || ""]));
-    const t5 = body.appendTable(taskRows);
-    styleTableHeader(t5, 5, "#dcfce7");
-  }
-  body.appendParagraph("");
-
-  // 6. その他
-  const h6 = body.appendParagraph("6. その他");
+  // 5. その他
+  const h6 = body.appendParagraph("5. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
@@ -1207,24 +1193,11 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     addBox(sl5, "施策データなし", 40, 80, 880, 60, 13, false, "#64748b");
   }
 
-  // スライド7: タスクテーブル
-  const sl6 = pres.appendSlide();
-  clearSlide(sl6);
-  setBg(sl6, BG_LIGHT);
-  addBox(sl6, "5. 進行中タスク", 40, 15, 880, 40, 18, true, ACCENT);
-  if (tasks.length === 0) {
-    addBox(sl6, "現在の未完了タスクはありません。", 40, 80, 880, 60, 13, false, "#64748b");
-  } else {
-    const taskRows = [["カテゴリ", "タスク名", "優先度", "ステータス", "メモ"]];
-    tasks.slice(0, 15).forEach(t => taskRows.push([t.category||"", t.taskName||"", t.priority||"", t.status||"", t.memo||""]));
-    addTable(sl6, taskRows, 20, 62, 920, Math.min(40 + tasks.length * 35 + 40, 450), "#dcfce7", 10);
-  }
-
-  // スライド8: その他
+  // スライド7: その他
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "6. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
+  addBox(sl7, "5. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
   addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
 
   pres.saveAndClose();
