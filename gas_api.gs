@@ -802,10 +802,55 @@ function createAgendaExternal(storeName, format, memo) {
   else if (isHighPrice && !isNewMajor) { quadrant = "VIP";      quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
   else if (!isHighPrice && isNewMajor) { quadrant = "お試し層"; quadrantMsg = "低単価×新規中心。次回予約率向上が最優先課題。"; }
   else                                 { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
+  const menuData = getMenuRatios(storeName, curYM);
   if (format === "slides") {
-    return createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
+    return createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData);
   } else {
-    return createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal);
+    return createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData);
+  }
+}
+
+// ─ メニュー構成比取得 ─
+function getMenuRatios(storeName, targetYM) {
+  try {
+    const ss = SpreadsheetApp.openById(SS_ID);
+    const ws = ss.getSheetByName(SHEET_SALES);
+    if (!ws) return null;
+    const rows = ws.getDataRange().getValues();
+    const counts = { matsu:0, mayu:0, matsuMayu:0, matsuMayuPerm:0, other:0 };
+    const amounts = { matsu:0, mayu:0, matsuMayu:0, matsuMayuPerm:0, other:0 };
+    for (let i = 1; i < rows.length; i++) {
+      const store = String(rows[i][0] || "").trim();
+      if (store !== storeName) continue;
+      const kubun = String(rows[i][5] || "").trim();
+      if (kubun !== "施術") continue;
+      if (targetYM) {
+        const dn = parseFloat(rows[i][1]) || 0;
+        if (Math.floor(dn / 100) !== targetYM) continue;
+      }
+      const mn = String(rows[i][8] || "").trim();
+      const cnt = parseFloat(rows[i][11]) || 1;
+      const amt = parseFloat(rows[i][12]) || 0;
+      const hasMatsu   = mn.includes("まつ毛パーマ") || mn.includes("マツパ") || mn.includes("まつパ");
+      const hasMayuWax = mn.includes("眉毛ワックス") || mn.includes("眉ワックス");
+      const hasMayuPerm= mn.includes("眉毛パーマ")  || mn.includes("眉パーマ");
+      let k;
+      if      (hasMatsu && hasMayuPerm) k = "matsuMayuPerm";
+      else if (hasMatsu && hasMayuWax)  k = "matsuMayu";
+      else if (hasMatsu)                k = "matsu";
+      else if (hasMayuWax)              k = "mayu";
+      else                              k = "other";
+      counts[k] += cnt; amounts[k] += amt;
+    }
+    const total = Object.values(counts).reduce((a,b)=>a+b,0);
+    const labels = {
+      matsu:"まつ毛パーマ単品", mayu:"眉毛ワックス単品",
+      matsuMayu:"まつ毛パーマ+眉毛ワックス", matsuMayuPerm:"まつ毛パーマ+眉毛パーマ", other:"その他"
+    };
+    return { counts, amounts, total, labels };
+  } catch(e) {
+    Logger.log("getMenuRatios error: " + e);
+    return null;
   }
 }
 
@@ -857,7 +902,7 @@ function styleTableHeader(table, cols, bgColor) {
   }
 }
 
-function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
+function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData) {
   const doc = DocumentApp.create(title);
   const body = doc.getBody();
   body.clear();
@@ -942,8 +987,31 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環").editAsText().setFontSize(10).setForegroundColor("#64748b");
   body.appendParagraph("");
 
-  // 4. 推奨アクション（ベストプラクティスより）
-  const h4 = body.appendParagraph("4. 推奨アクション（ベストプラクティスより）");
+  // 4. メニュー構成比
+  const h4m = body.appendParagraph("4. メニュー構成比");
+  h4m.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h4m.editAsText().setForegroundColor("#1e40af").setBold(true);
+  if (menuData && menuData.total > 0) {
+    const mKeys = ["matsu","mayu","matsuMayu","matsuMayuPerm","other"];
+    const menuRows = [["メニュー", "件数", "比率", "売上金額"]];
+    mKeys.forEach(k => {
+      const cnt = menuData.counts[k];
+      if (cnt === 0) return;
+      const ratio = Math.round(cnt / menuData.total * 100) + "%";
+      const amt = "¥" + Math.round(menuData.amounts[k]).toLocaleString();
+      menuRows.push([menuData.labels[k], cnt + "件", ratio, amt]);
+    });
+    const totalAmt = "¥" + Math.round(Object.values(menuData.amounts).reduce((a,b)=>a+b,0)).toLocaleString();
+    menuRows.push(["合計", menuData.total + "件", "100%", totalAmt]);
+    const tm = body.appendTable(menuRows);
+    styleTableHeader(tm, 4, "#dcfce7");
+  } else {
+    body.appendParagraph("メニューデータなし").editAsText().setFontSize(11);
+  }
+  body.appendParagraph("");
+
+  // 5. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("5. 推奨アクション（ベストプラクティスより）");
   h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4.editAsText().setForegroundColor("#1e40af").setBold(true);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
@@ -957,8 +1025,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 5. 進行中タスク
-  const h5 = body.appendParagraph("5. 進行中タスク");
+  // 6. 進行中タスク
+  const h5 = body.appendParagraph("6. 進行中タスク");
   h5.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h5.editAsText().setForegroundColor("#1e40af").setBold(true);
   if (tasks.length === 0) {
@@ -971,8 +1039,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 6. その他
-  const h6 = body.appendParagraph("6. その他");
+  // 7. その他
+  const h6 = body.appendParagraph("7. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
@@ -985,7 +1053,7 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   return doc.getUrl();
 }
 
-function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal) {
+function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData) {
   const pres = SlidesApp.create(title);
   const BG_DARK = "#0f172a";
   const BG_LIGHT = "#f8fafc";
@@ -1071,7 +1139,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     "目標:　　 ¥" + fmt(s.売上目標) + "　→　" + salesPct + "%" + (sPrev ? tr(s.実績売上, sPrev.実績売上) : "") + "\n" +
     (sPrev ? "前月実績: ¥" + fmt(sPrev.実績売上) + " (" + (sPrev.達成率||0) + "%)\n" : "") +
     "\n月末見込: ¥" + fmt(s.見込み売上) + "　→　" + mkPct2 + "%",
-    40, 65, 420, 280, 13, false, "#1e293b");
+    40, 65, 410, 350, 13, false, "#1e293b");
   // 達成率グラフ
   const chartLabels = ["売上", "見込み", "総客数", "回数券"];
   const chartVals = [
@@ -1080,7 +1148,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     pct(s.総客数実績, s.総客数目標),
     pct(s.回数券売上実績, s.回数券売上目標)
   ];
-  addChart(sl2, chartLabels, chartVals, "KPI達成率(%)", 470, 55, 460, 310);
+  addChart(sl2, chartLabels, chartVals, "KPI達成率(%)", 460, 55, 480, 390);
 
   // スライド3: KPI詳細テーブル
   const sl3 = pres.appendSlide();
@@ -1102,11 +1170,51 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   ];
   addTable(sl3, kpiRows, 20, 62, 920, 440, "#dbeafe", 10);
 
-  // スライド4: 顧客象限
+  // スライド4: メニュー構成比
+  const sl4m = pres.appendSlide();
+  clearSlide(sl4m);
+  setBg(sl4m, BG_LIGHT);
+  addBox(sl4m, "3. メニュー構成比", 40, 15, 500, 40, 18, true, ACCENT);
+  if (menuData && menuData.total > 0) {
+    // 円グラフ（左側）
+    try {
+      const pieDt = Charts.newDataTable()
+        .addColumn(Charts.ColumnType.STRING, "メニュー")
+        .addColumn(Charts.ColumnType.NUMBER, "件数");
+      const pieKeys = ["matsu","mayu","matsuMayu","matsuMayuPerm"];
+      pieKeys.forEach(k => {
+        if (menuData.counts[k] > 0) pieDt.addRow([menuData.labels[k], menuData.counts[k]]);
+      });
+      if (menuData.counts.other > 0) pieDt.addRow(["その他", menuData.counts.other]);
+      const pieChart = Charts.newPieChart()
+        .setDataTable(pieDt.build())
+        .setTitle("メニュー構成比（件数）")
+        .setDimensions(460, 420)
+        .setOption("legend.position", "bottom")
+        .build();
+      sl4m.insertImage(pieChart.getAs("image/png"), 20, 60, 460, 420);
+    } catch(pe) { Logger.log("pie error: " + pe); }
+    // テーブル（右側）
+    const mKeys = ["matsu","mayu","matsuMayu","matsuMayuPerm","other"];
+    const mRows = [["メニュー", "件数", "比率", "売上"]];
+    mKeys.forEach(k => {
+      const cnt = menuData.counts[k];
+      if (cnt === 0) return;
+      const ratio = menuData.total > 0 ? Math.round(cnt / menuData.total * 100) + "%" : "—";
+      const amt = Math.round(menuData.amounts[k] / 10000) + "万円";
+      mRows.push([menuData.labels[k], cnt + "件", ratio, amt]);
+    });
+    mRows.push(["合計", menuData.total + "件", "100%", Math.round(Object.values(menuData.amounts).reduce((a,b)=>a+b,0)/10000) + "万円"]);
+    addTable(sl4m, mRows, 500, 60, 440, 420, "#dbeafe", 10);
+  } else {
+    addBox(sl4m, "メニューデータなし（売上明細シートに施術データが必要です）", 40, 80, 880, 60, 13, false, "#64748b");
+  }
+
+  // スライド5: 顧客象限
   const sl4 = pres.appendSlide();
   clearSlide(sl4);
   setBg(sl4, BG_DARK);
-  addBox(sl4, "3. 顧客象限分析", 40, 20, 880, 45, 20, true, "#60a5fa");
+  addBox(sl4, "4. 顧客象限分析", 40, 20, 880, 45, 20, true, "#60a5fa");
   addBox(sl4, "現在のポジション: 【" + quadrant + "】", 40, 80, 880, 50, 22, true, "#fbbf24");
   addBox(sl4, quadrantMsg, 40, 145, 880, 50, 14, false, "#e2e8f0");
   addBox(sl4,
@@ -1115,11 +1223,11 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     "集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環",
     40, 210, 880, 180, 14, false, "#94a3b8");
 
-  // スライド5: 推奨アクション
+  // スライド6: 推奨アクション
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "4. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
+  addBox(sl5, "5. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
   if (strategies.length > 0) {
     const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
@@ -1129,11 +1237,11 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     addBox(sl5, "施策データなし", 40, 80, 880, 60, 13, false, "#64748b");
   }
 
-  // スライド6: タスクテーブル
+  // スライド7: タスクテーブル
   const sl6 = pres.appendSlide();
   clearSlide(sl6);
   setBg(sl6, BG_LIGHT);
-  addBox(sl6, "5. 進行中タスク", 40, 15, 880, 40, 18, true, ACCENT);
+  addBox(sl6, "6. 進行中タスク", 40, 15, 880, 40, 18, true, ACCENT);
   if (tasks.length === 0) {
     addBox(sl6, "現在の未完了タスクはありません。", 40, 80, 880, 60, 13, false, "#64748b");
   } else {
@@ -1142,11 +1250,11 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     addTable(sl6, taskRows, 20, 62, 920, Math.min(40 + tasks.length * 35 + 40, 450), "#dcfce7", 10);
   }
 
-  // スライド7: その他
+  // スライド8: その他
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "6. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
+  addBox(sl7, "7. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
   addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
 
   pres.saveAndClose();
