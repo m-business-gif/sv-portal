@@ -22,7 +22,7 @@
 | 項目 | 値 |
 |---|---|
 | ポータルURL | `https://m-business-gif.github.io/sv-portal/` |
-| GAS APIエンドポイント | `https://script.google.com/macros/s/AKfycbzFdNCS39cgN9113_6eLwKlQ4IsiaqWuC8hmFHxa57MZDGFk0_LttjrhOkXaY_uKYBh/exec` |
+| GAS APIエンドポイント | `https://script.google.com/macros/s/AKfycbwSIbBQipMFFTgUutTBdWj-w4gP5KMuNA195gP6bJfClDxzrg1DGSlT3zSVHdt8Dw7T/exec` |
 | GASエディタ | `https://script.google.com/d/1FdMryXF5JaS4CkoKJSdzJvIOnplwLsVz-Agx3pXgd8CFADaFhtCo818H/edit` |
 | スプレッドシートID | `1K-4ub8YvFh__JrseNKGiCkGigDYykraIwocOhLQLevY` |
 | GitHubリポジトリ | `/Users/yamadamasaya/sv-portal`（ローカル） |

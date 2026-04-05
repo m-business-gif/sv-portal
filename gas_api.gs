@@ -110,6 +110,14 @@ function doPost(e) {
       const count = repairGoalSheetFn();
       return json({ ok: true, repairedRows: count });
     }
+    if (data.action === "syncGoalData") {
+      const count = syncGoalDataFn();
+      return json({ ok: true, syncedRows: count });
+    }
+    if (data.action === "restoreImportRange") {
+      restoreImportRangeFn();
+      return json({ ok: true });
+    }
     return json({ error: "unknown action" });
   } catch(err) {
     return json({ error: err.toString() });
@@ -605,6 +613,56 @@ function updateGoalFn(name, ym, goals) {
   addStoreFn(sv, name, ym, goals);
 }
 
+// ─ 加盟店目標シートのIMPORTRANGEを復元 ─
+function restoreImportRangeFn() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_GOAL);
+  // 現在の値データをクリア（行2以降）
+  const lastRow = ws.getLastRow();
+  if (lastRow >= 2) {
+    ws.getRange(2, 1, lastRow - 1, ws.getLastColumn()).clearContent();
+  }
+  // A2にIMPORTRANGE数式をセット
+  ws.getRange("A2").setFormula(
+    '=IMPORTRANGE("1B2eQ8K4oN7DgvTU3-mWF8ZShfDDVPXM8aU6GuxlWwMI","目標!A2:AI1057")'
+  );
+}
+
+// ─ 分析SSから加盟店目標シートにデータを直接同期 ─
+// IMPORTRANGEが壊れた場合の代替。GASがSpreadsheetApp経由で両SSにアクセスし値をコピー
+function syncGoalDataFn() {
+  const SOURCE_SS_ID = "1B2eQ8K4oN7DgvTU3-mWF8ZShfDDVPXM8aU6GuxlWwMI";
+  const SOURCE_SHEET = "目標";
+
+  // 参照元から取得
+  const srcSS = SpreadsheetApp.openById(SOURCE_SS_ID);
+  const srcWs = srcSS.getSheetByName(SOURCE_SHEET);
+  const srcData = srcWs.getDataRange().getValues();
+  // ヘッダー行を除いたデータ（行2〜）
+  const dataRows = srcData.slice(1); // A2〜の値
+
+  // 参照先の加盟店目標シートのA2セルの数式を削除して値で上書き
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_GOAL);
+
+  // A2のIMPORTRANGE数式を削除
+  ws.getRange("A2").clearContent();
+
+  // 既存データ（行2以降）をクリア
+  const lastRow = ws.getLastRow();
+  if (lastRow >= 2) {
+    ws.getRange(2, 1, lastRow - 1, ws.getLastColumn()).clearContent();
+  }
+
+  // 分析SSのデータを値として貼り付け
+  if (dataRows.length > 0) {
+    const cols = dataRows[0].length;
+    ws.getRange(2, 1, dataRows.length, cols).setValues(dataRows);
+  }
+
+  return dataRows.length;
+}
+
 // ─ 加盟店目標シート 歴史データ修復 ─
 // 202603行（完全データあり）をテンプレートに、それ以前の年月で
 // A/B/C列（直営/加盟・SV・店舗名）が空の行を一括補完する
@@ -920,6 +978,10 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
 
   doc.saveAndClose();
+  // 他アカウントからも閲覧できるようリンク共有を設定
+  try {
+    DriveApp.getFileById(doc.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch(shareErr) { Logger.log("doc share error: " + shareErr); }
   return doc.getUrl();
 }
 
@@ -931,6 +993,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   const fmt = n => Math.round(n || 0).toLocaleString();
   const newPct = Math.round(newRatio * 100);
   const dateStr = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd");
+  const pct = (a, g) => g > 0 ? Math.min(Math.round(a / g * 100), 999) : 0;
 
   function clearSlide(sl) { sl.getPageElements().forEach(el => el.remove()); }
   function addBox(sl, text, x, y, w, h, fontSize, bold, color) {
@@ -941,9 +1004,51 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     if (color) ts.setForegroundColor(color);
     return tb;
   }
-  function setBg(sl, color) {
-    sl.getBackground().setSolidFill(color);
+  function setBg(sl, color) { sl.getBackground().setSolidFill(color); }
+
+  // テーブル挿入ヘルパー
+  function addTable(sl, rows, left, top, width, height, headerColor, fs) {
+    const nr = rows.length, nc = rows[0].length;
+    const tbl = sl.insertTable(nr, nc, left, top, width, height);
+    rows.forEach((row, r) => {
+      row.forEach((txt, c) => {
+        const cell = tbl.getCell(r, c);
+        cell.getText().setText(String(txt != null ? txt : ""));
+        const ts = cell.getText().getTextStyle();
+        ts.setFontSize(fs || 10);
+        if (r === 0) { cell.getFill().setSolidFill(headerColor || "#dbeafe"); ts.setBold(true); }
+      });
+    });
+    return tbl;
   }
+
+  // 棒グラフ（達成率）挿入ヘルパー
+  function addChart(sl, labels, values, chartTitle, left, top, w, h) {
+    try {
+      const dt = Charts.newDataTable()
+        .addColumn(Charts.ColumnType.STRING, "KPI")
+        .addColumn(Charts.ColumnType.NUMBER, "達成率(%)");
+      labels.forEach((l, i) => dt.addRow([l, values[i] || 0]));
+      const chart = Charts.newBarChart()
+        .setDataTable(dt.build())
+        .setTitle(chartTitle || "")
+        .setColors(["#2563eb"])
+        .setDimensions(w, h)
+        .setOption("hAxis.minValue", 0)
+        .setOption("hAxis.maxValue", 150)
+        .setOption("legend.position", "none")
+        .build();
+      sl.insertImage(chart.getAs("image/png"), left, top, w, h);
+    } catch(chartErr) { Logger.log("chart error: " + chartErr); }
+  }
+
+  const tr = (cur, prev) => {
+    if (!prev || prev === 0) return "";
+    const d = cur - prev;
+    const p = Math.round(Math.abs(d) / prev * 100);
+    return d > 0 ? " ▲" + p + "%" : d < 0 ? " ▼" + p + "%" : " →";
+  };
+  const prevL = sPrev ? prevYMStr : "";
 
   // スライド1: タイトル
   const sl1 = pres.getSlides()[0];
@@ -953,44 +1058,49 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   addBox(sl1, "担当SV: " + s.sv + "　" + dateStr + "　象限:【" + quadrant + "】", 40, 260, 880, 40, 16, false, "#94a3b8");
   addBox(sl1, quadrantMsg, 40, 310, 880, 50, 13, false, "#60a5fa");
 
-  const tr = (cur, prev) => {
-    if (!prev || prev === 0) return "";
-    const d = cur - prev;
-    const p = Math.round(Math.abs(d) / prev * 100);
-    return d > 0 ? "  ▲" + p + "%" : d < 0 ? "  ▼" + p + "%" : "  →";
-  };
-  const prevL = sPrev ? prevYMStr : "";
-
-  // スライド2: 店舗サマリー
+  // スライド2: 店舗サマリー（テキスト左 + 達成率グラフ右）
   const sl2 = pres.appendSlide();
   clearSlide(sl2);
   setBg(sl2, BG_LIGHT);
-  addBox(sl2, "1. 店舗サマリー", 40, 20, 500, 45, 20, true, ACCENT);
-  if (prevL) addBox(sl2, "前月: " + prevL, 550, 20, 380, 40, 12, false, "#64748b");
+  addBox(sl2, "1. 店舗サマリー", 40, 15, 500, 40, 18, true, ACCENT);
+  if (prevL) addBox(sl2, "比較: " + prevL, 560, 15, 360, 35, 11, false, "#64748b");
   const salesPct = s.達成率 || 0;
-  const mkPct = s.見込み達成率 || 0;
+  const mkPct2 = s.見込み達成率 || 0;
   addBox(sl2,
-    "売上実績:　¥" + fmt(s.実績売上) + "  /  目標 ¥" + fmt(s.売上目標) + "  →  " + salesPct + "%" +
-      (sPrev ? tr(s.実績売上, sPrev.実績売上) + "　（前月: ¥" + fmt(sPrev.実績売上) + " " + (sPrev.達成率||0) + "%）" : "") + "\n" +
-    "月末見込み:　¥" + fmt(s.見込み売上) + "  →  " + mkPct + "%",
-    40, 80, 880, 230, 14, false, "#1e293b");
+    "売上実績: ¥" + fmt(s.実績売上) + "\n" +
+    "目標:　　 ¥" + fmt(s.売上目標) + "　→　" + salesPct + "%" + (sPrev ? tr(s.実績売上, sPrev.実績売上) : "") + "\n" +
+    (sPrev ? "前月実績: ¥" + fmt(sPrev.実績売上) + " (" + (sPrev.達成率||0) + "%)\n" : "") +
+    "\n月末見込: ¥" + fmt(s.見込み売上) + "　→　" + mkPct2 + "%",
+    40, 65, 420, 280, 13, false, "#1e293b");
+  // 達成率グラフ
+  const chartLabels = ["売上", "見込み", "総客数", "回数券"];
+  const chartVals = [
+    pct(s.実績売上, s.売上目標),
+    mkPct2,
+    pct(s.総客数実績, s.総客数目標),
+    pct(s.回数券売上実績, s.回数券売上目標)
+  ];
+  addChart(sl2, chartLabels, chartVals, "KPI達成率(%)", 470, 55, 460, 310);
 
-  // スライド3: KPI詳細
+  // スライド3: KPI詳細テーブル
   const sl3 = pres.appendSlide();
   clearSlide(sl3);
   setBg(sl3, BG_LIGHT);
-  addBox(sl3, "2. KPI詳細", 40, 20, 500, 45, 20, true, ACCENT);
-  if (prevL) addBox(sl3, "前月: " + prevL, 550, 20, 380, 40, 12, false, "#64748b");
+  addBox(sl3, "2. KPI詳細", 40, 15, 500, 40, 18, true, ACCENT);
+  if (prevL) addBox(sl3, "比較: " + prevL, 560, 15, 360, 35, 11, false, "#64748b");
   const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
   const prevNextRes = sPrev ? Math.round((sPrev.次回予約率実績||0)*100) : null;
-  addBox(sl3,
-    "総客数:　" + fmt(s.総客数実績) + "人" + (sPrev ? tr(s.総客数実績, sPrev.総客数実績) + "（前月:" + fmt(sPrev.総客数実績) + "人）" : "") + "  /  目標 " + fmt(s.総客数目標) + "人　BP:135人\n" +
-    "新規:　" + fmt(s.新規実績) + "人" + (sPrev ? "（前月:" + fmt(sPrev.新規実績) + "人）" : "") + "  /  再来: " + fmt(s.再来実績) + "人" + (sPrev ? "（前月:" + fmt(sPrev.再来実績) + "人）" : "") + "\n" +
-    "客単価:　¥" + fmt(s.客単価実績) + (sPrev ? tr(s.客単価実績, sPrev.客単価実績) + "（前月:¥" + fmt(sPrev.客単価実績) + "）" : "") + "  /  目標 ¥" + fmt(s.客単価目標) + "　BP:¥5,020" + (unitPrice < 5020 ? " ⚠" : " ✓") + "\n" +
-    "次回予約率:　" + nextResPct + "%" + (prevNextRes !== null ? "（前月:" + prevNextRes + "%）" : "") + "　BP:35%以上" + (nextResPct < 35 ? " ⚠" : " ✓") + "\n" +
-    "回数券売上:　¥" + fmt(s.回数券売上実績) + (sPrev ? tr(s.回数券売上実績, sPrev.回数券売上実績) + "（前月:¥" + fmt(sPrev.回数券売上実績) + "）" : "") + "\n" +
-    "物販売上:　¥" + fmt(s.物販売上実績) + (sPrev ? tr(s.物販売上実績, sPrev.物販売上実績) + "（前月:¥" + fmt(sPrev.物販売上実績) + "）" : "") + "　BP:¥29,700",
-    40, 80, 880, 300, 13, false, "#1e293b");
+  const kpiRows = [
+    ["指標", "当月実績", "目標", "達成率", prevL || "前月", "前月比"],
+    ["総客数",    fmt(s.総客数実績)+"人",  fmt(s.総客数目標)+"人",  pct(s.総客数実績,s.総客数目標)+"%",  sPrev?fmt(sPrev.総客数実績)+"人":"—",  sPrev?tr(s.総客数実績,sPrev.総客数実績):"—"],
+    ["新規客数",  fmt(s.新規実績)+"人",    fmt(s.新規目標)+"人",    pct(s.新規実績,s.新規目標)+"%",       sPrev?fmt(sPrev.新規実績)+"人":"—",    sPrev?tr(s.新規実績,sPrev.新規実績):"—"],
+    ["再来客数",  fmt(s.再来実績)+"人",    fmt(s.再来目標)+"人",    pct(s.再来実績,s.再来目標)+"%",       sPrev?fmt(sPrev.再来実績)+"人":"—",    sPrev?tr(s.再来実績,sPrev.再来実績):"—"],
+    ["客単価",    "¥"+fmt(s.客単価実績),   "¥"+fmt(s.客単価目標),  pct(s.客単価実績,s.客単価目標)+"%",   sPrev?"¥"+fmt(sPrev.客単価実績):"—",   sPrev?tr(s.客単価実績,sPrev.客単価実績):"—"],
+    ["次回予約率",nextResPct+"%" + (nextResPct<35?" ⚠":""),  "35%以上", "—", prevNextRes!==null?prevNextRes+"%":"—", "—"],
+    ["回数券売上","¥"+fmt(s.回数券売上実績),"¥"+fmt(s.回数券売上目標),pct(s.回数券売上実績,s.回数券売上目標)+"%",sPrev?"¥"+fmt(sPrev.回数券売上実績):"—",sPrev?tr(s.回数券売上実績,sPrev.回数券売上実績):"—"],
+    ["物販売上",  "¥"+fmt(s.物販売上実績), "BP:¥29,700", "—",         sPrev?"¥"+fmt(sPrev.物販売上実績):"—",  sPrev?tr(s.物販売上実績,sPrev.物販売上実績):"—"],
+  ];
+  addTable(sl3, kpiRows, 20, 62, 920, 440, "#dbeafe", 10);
 
   // スライド4: 顧客象限
   const sl4 = pres.appendSlide();
@@ -1001,29 +1111,36 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   addBox(sl4, quadrantMsg, 40, 145, 880, 50, 14, false, "#e2e8f0");
   addBox(sl4,
     "新規比率: " + newPct + "% / 再来: " + (100 - newPct) + "%\n" +
-    "客単価: ¥" + fmt(unitPrice) + "  （目標比: " + (unitPrice >= unitGoal ? "▲ 達成" : "▼ 未達") + "）\n\n" +
+    "客単価: ¥" + fmt(unitPrice) + "  （" + (unitPrice >= unitGoal ? "▲ 目標達成" : "▼ 目標未達") + "）\n\n" +
     "集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環",
     40, 210, 880, 180, 14, false, "#94a3b8");
 
-  // スライド5: 推奨アクション（BP）
+  // スライド5: 推奨アクション
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "4. 推奨アクション（ベストプラクティスより）", 40, 20, 880, 45, 18, true, ACCENT);
+  addBox(sl5, "4. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
-  const stratText = strategies.length === 0 ? "施策データなし" :
-    strategies.slice(0, 6).map((st, i) => (i+1) + ". 【" + (st.importance||"") + "】" + st.name + "（" + (st.target||"—") + "）").join("\n");
-  addBox(sl5, stratText, 40, 80, 880, 380, 13, false, "#1e293b");
+  if (strategies.length > 0) {
+    const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
+    strategies.slice(0, 8).forEach(st => stratRows.push([st.name||"", st.target||"—", st.importance||"—", st.timing||"—"]));
+    addTable(sl5, stratRows, 20, 62, 920, 440, "#fef9c3", 10);
+  } else {
+    addBox(sl5, "施策データなし", 40, 80, 880, 60, 13, false, "#64748b");
+  }
 
-  // スライド6: 進行中タスク
+  // スライド6: タスクテーブル
   const sl6 = pres.appendSlide();
   clearSlide(sl6);
   setBg(sl6, BG_LIGHT);
-  addBox(sl6, "5. 進行中タスク", 40, 20, 880, 45, 18, true, ACCENT);
-  const taskText = tasks.length === 0
-    ? "現在の未完了タスクはありません。"
-    : tasks.map(t => "【" + (t.priority||"") + "】[" + (t.category||"") + "] " + t.taskName + (t.memo ? "  →  " + t.memo : "")).join("\n");
-  addBox(sl6, taskText, 40, 80, 880, 380, 13, false, "#1e293b");
+  addBox(sl6, "5. 進行中タスク", 40, 15, 880, 40, 18, true, ACCENT);
+  if (tasks.length === 0) {
+    addBox(sl6, "現在の未完了タスクはありません。", 40, 80, 880, 60, 13, false, "#64748b");
+  } else {
+    const taskRows = [["カテゴリ", "タスク名", "優先度", "ステータス", "メモ"]];
+    tasks.slice(0, 15).forEach(t => taskRows.push([t.category||"", t.taskName||"", t.priority||"", t.status||"", t.memo||""]));
+    addTable(sl6, taskRows, 20, 62, 920, Math.min(40 + tasks.length * 35 + 40, 450), "#dcfce7", 10);
+  }
 
   // スライド7: その他
   const sl7 = pres.appendSlide();
@@ -1033,6 +1150,10 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
 
   pres.saveAndClose();
+  // 他アカウントからも閲覧できるようリンク共有を設定
+  try {
+    DriveApp.getFileById(pres.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch(shareErr) { Logger.log("slides share error: " + shareErr); }
   return pres.getUrl();
 }
 
