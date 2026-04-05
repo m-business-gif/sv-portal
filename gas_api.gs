@@ -1119,14 +1119,19 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
 
   function clearSlide(sl) { sl.getPageElements().forEach(el => el.remove()); }
   function addBox(sl, text, x, y, w, h, fontSize, bold, color) {
-    const tb = sl.insertTextBox(text, x, y, w, h);
-    const ts = tb.getText().getTextStyle();
-    ts.setFontSize(fontSize || 14);
-    if (bold) ts.setBold(true);
-    if (color) ts.setForegroundColor(color);
+    const tb = sl.insertTextBox(text || " ", x, y, w, h);
+    try {
+      const runs = tb.getText().getRuns();
+      if (runs.length > 0) {
+        const ts = runs[0].getTextStyle();
+        ts.setFontSize(fontSize || 14);
+        if (bold) ts.setBold(true);
+        if (color) ts.setForegroundColor(color);
+      }
+    } catch(e) { Logger.log("addBox style err: " + e); }
     return tb;
   }
-  function setBg(sl, color) { sl.getBackground().setSolidFill(color); }
+  function setBg(sl, color) { try { sl.getBackground().setSolidFill(color); } catch(e) {} }
 
   // テーブル挿入ヘルパー
   function addTable(sl, rows, left, top, width, height, headerColor, fs) {
