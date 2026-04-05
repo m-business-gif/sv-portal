@@ -828,7 +828,7 @@ function getMenuRatios(storeName, targetYM) {
         const dn = parseFloat(rows[i][1]) || 0;
         if (Math.floor(dn / 100) !== targetYM) continue;
       }
-      const mn = String(rows[i][8] || "").trim();
+      const mn = (String(rows[i][7] || "") + " " + String(rows[i][8] || "")).trim();
       const cnt = parseFloat(rows[i][11]) || 1;
       const amt = parseFloat(rows[i][12]) || 0;
       const hasMatsu   = mn.includes("まつ毛パーマ") || mn.includes("マツパ") || mn.includes("まつパ");
