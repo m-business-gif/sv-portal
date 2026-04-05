@@ -790,12 +790,13 @@ function createAgendaExternal(storeName, format, memo) {
   const sPrev = prevStores.find(st => st.name === storeName) || null;
 
   const tasks = getTasks().filter(t => t.store === storeName && t.status !== "完了");
-  const ym = Utilities.formatDate(today, "Asia/Tokyo", "yyyy年M月");
-  const title = storeName + " オーナーMTGアジェンダ " + ym;
-  const total = (s.新規実績 || 0) + (s.再来実績 || 0);
-  const newRatio = total > 0 ? s.新規実績 / total : 0.5;
-  const unitPrice = s.客単価実績 || 0;
-  const unitGoal  = s.客単価目標 || 5020;
+  const title = storeName + " オーナーMTGアジェンダ " + prevYMStr + "振り返り";
+  // 分析は先月データ（sPrev）を優先。なければ当月で代替
+  const sA = sPrev || s;
+  const total = (sA.新規実績 || 0) + (sA.再来実績 || 0);
+  const newRatio = total > 0 ? sA.新規実績 / total : 0.5;
+  const unitPrice = sA.客単価実績 || 0;
+  const unitGoal  = sA.客単価目標 || 5020;
   const BP_UNIT = 5020;
   const isHighPrice = unitPrice >= BP_UNIT;
   const isNewMajor  = newRatio > 0.5;
@@ -804,7 +805,8 @@ function createAgendaExternal(storeName, format, memo) {
   else if (isHighPrice && !isNewMajor) { quadrant = "VIP";      quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
   else if (!isHighPrice && isNewMajor) { quadrant = "お試し層"; quadrantMsg = "低単価×新規中心。次回予約率向上が最優先課題。"; }
   else                                 { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
-  const menuData = getMenuRatios(storeName, curYM);
+  // メニュー比率は先月YMで取得
+  const menuData = getMenuRatios(storeName, prevYM);
   if (format === "slides") {
     return createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData);
   } else {
@@ -1067,7 +1069,7 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   const h4i = body.appendParagraph("4. 課題分析");
   h4i.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4i.editAsText().setForegroundColor("#1e40af").setBold(true);
-  const issues = generateIssues(s, unitPrice, unitGoal, newRatio);
+  const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
   if (issues.length === 0) {
     body.appendParagraph("現時点で大きな課題は検出されませんでした。").editAsText().setFontSize(11);
   } else {
@@ -1282,7 +1284,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   clearSlide(slIssue);
   setBg(slIssue, BG_LIGHT);
   addBox(slIssue, "4. 課題分析", 40, 15, 880, 40, 18, true, ACCENT);
-  const issues = generateIssues(s, unitPrice, unitGoal, newRatio);
+  const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
   if (issues.length === 0) {
     addBox(slIssue, "現時点で大きな課題は検出されませんでした。", 40, 80, 880, 60, 13, false, "#64748b");
   } else {
