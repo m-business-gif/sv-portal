@@ -730,13 +730,14 @@ function createAgenda(storeName, format, memo) {
   const allTasks = getTasks();
   const storeTasks = allTasks.filter(t => t.store === storeName && t.status !== "完了");
 
-  // 4象限判定
+  // 4象限判定（BP基準: 施術単価¥5,020固定で高/低を判定）
   const total = (s.新規実績 || 0) + (s.再来実績 || 0);
   const newRatio = total > 0 ? s.新規実績 / total : 0.5;
   const unitPrice = s.客単価実績 || 0;
-  const unitGoal  = s.客単価目標 || 5000;
-  const isHighPrice = unitPrice >= unitGoal;
-  const isNewMajor  = newRatio >= 0.5;
+  const unitGoal  = s.客単価目標 || 5020;
+  const BP_UNIT = 5020;
+  const isHighPrice = unitPrice >= BP_UNIT;
+  const isNewMajor  = newRatio > 0.5;
   let quadrant = "", quadrantMsg = "";
   if (isHighPrice && isNewMajor)       { quadrant = "優良新規"; quadrantMsg = "高単価×新規中心。VIPへの転換を促す施策が重要。"; }
   else if (isHighPrice && !isNewMajor) { quadrant = "VIP";      quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
@@ -794,9 +795,10 @@ function createAgendaExternal(storeName, format, memo) {
   const total = (s.新規実績 || 0) + (s.再来実績 || 0);
   const newRatio = total > 0 ? s.新規実績 / total : 0.5;
   const unitPrice = s.客単価実績 || 0;
-  const unitGoal  = s.客単価目標 || 5000;
-  const isHighPrice = unitPrice >= unitGoal;
-  const isNewMajor  = newRatio >= 0.5;
+  const unitGoal  = s.客単価目標 || 5020;
+  const BP_UNIT = 5020;
+  const isHighPrice = unitPrice >= BP_UNIT;
+  const isNewMajor  = newRatio > 0.5;
   let quadrant = "", quadrantMsg = "";
   if (isHighPrice && isNewMajor)       { quadrant = "優良新規"; quadrantMsg = "高単価×新規中心。VIPへの転換を促す施策が重要。"; }
   else if (isHighPrice && !isNewMajor) { quadrant = "VIP";      quadrantMsg = "高単価×再来中心。最良の状態。維持と口コミ促進を。"; }
