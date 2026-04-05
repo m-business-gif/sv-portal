@@ -854,6 +854,76 @@ function getMenuRatios(storeName, targetYM) {
   }
 }
 
+// ─ 課題自動判定（コンサルタント目線） ─
+function generateIssues(s, unitPrice, unitGoal, newRatio) {
+  const issues = [];
+  const fmt = n => Math.round(n || 0).toLocaleString();
+  const forecastPct = s.見込み達成率 || 0;
+  const newPct = Math.round(newRatio * 100);
+  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
+  const guestPct = s.総客数目標 > 0 ? Math.round((s.総客数実績||0) / s.総客数目標 * 100) : 0;
+  const ticketPct = s.回数券売上目標 > 0 ? Math.round((s.回数券売上実績||0) / s.回数券売上目標 * 100) : 0;
+
+  if (forecastPct < 100) {
+    issues.push({
+      title: "月末着地が目標未達見込み",
+      detail: "見込み達成率 " + forecastPct + "%（¥" + fmt(s.見込み売上) + " / 目標 ¥" + fmt(s.売上目標) + "）",
+      comment: "残り期間でのフォロー強化と回数券・物販の積み増しが急務。"
+    });
+  }
+  if (nextResPct < 35) {
+    issues.push({
+      title: "次回予約率が基準（35%）以下",
+      detail: "次回予約率 " + nextResPct + "%",
+      comment: "施術中のクロージングトークが不足している可能性。退店前に必ず次回日程を提案する習慣をつける。"
+    });
+  }
+  if (newPct > 60) {
+    issues.push({
+      title: "新規依存度が高くリピート定着が課題",
+      detail: "新規比率 " + newPct + "% / 再来比率 " + (100 - newPct) + "%",
+      comment: "新規を獲得しても再来につながっていない状態。次回予約・回数券販売でリピート率向上を優先する。"
+    });
+  }
+  if (newPct < 20) {
+    issues.push({
+      title: "新規流入が不足",
+      detail: "新規比率 " + newPct + "%",
+      comment: "SNS・口コミ・ホットペッパー露出を見直し、新規集客施策を強化する必要がある。"
+    });
+  }
+  if (guestPct < 80 && s.総客数目標 > 0) {
+    issues.push({
+      title: "総客数が目標を大きく下回っている",
+      detail: "達成率 " + guestPct + "%（" + fmt(s.総客数実績) + "人 / 目標 " + fmt(s.総客数目標) + "人）",
+      comment: "新規・再来の両面で客数が不足。集客経路と離脱タイミングの分析が必要。"
+    });
+  }
+  if (unitPrice < unitGoal && unitGoal > 0) {
+    issues.push({
+      title: "客単価が目標未達",
+      detail: "¥" + fmt(unitPrice) + "（目標 ¥" + fmt(unitGoal) + "）",
+      comment: "オプション・物販・コースメニューの提案が不十分。メニュー構成比と合わせて提案内容を見直す。"
+    });
+  }
+  if (ticketPct < 70 && s.回数券売上目標 > 0) {
+    issues.push({
+      title: "回数券販売が低調",
+      detail: "達成率 " + ticketPct + "%（¥" + fmt(s.回数券売上実績) + " / 目標 ¥" + fmt(s.回数券売上目標) + "）",
+      comment: "LTV向上の最重要施策。施術後の自然な流れでメリットを伝えるトーク設計を見直す。"
+    });
+  }
+  if ((s.物販売上実績 || 0) < 29700) {
+    issues.push({
+      title: "物販売上がBP基準（¥29,700）未達",
+      detail: "物販売上 ¥" + fmt(s.物販売上実績),
+      comment: "アフターケア商品の提案機会を増やす。施術内容と連動した商品提案（眉ケア・まつ毛美容液など）が有効。"
+    });
+  }
+
+  return issues;
+}
+
 // ─ ベストプラクティス施策取得 ─
 function getRelevantStrategies(quadrant, metrics) {
   try {
@@ -991,8 +1061,23 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 4. 推奨アクション（ベストプラクティスより）
-  const h4 = body.appendParagraph("4. 推奨アクション（ベストプラクティスより）");
+  // 4. 課題分析
+  const h4i = body.appendParagraph("4. 課題分析");
+  h4i.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h4i.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const issues = generateIssues(s, unitPrice, unitGoal, newRatio);
+  if (issues.length === 0) {
+    body.appendParagraph("現時点で大きな課題は検出されませんでした。").editAsText().setFontSize(11);
+  } else {
+    const issueRows = [["課題", "現状", "コンサルコメント"]];
+    issues.forEach(iss => issueRows.push([iss.title, iss.detail, iss.comment]));
+    const ti = body.appendTable(issueRows);
+    styleTableHeader(ti, 3, "#fee2e2");
+  }
+  body.appendParagraph("");
+
+  // 5. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("5. 推奨アクション（ベストプラクティスより）");
   h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4.editAsText().setForegroundColor("#1e40af").setBold(true);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
@@ -1006,8 +1091,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 5. その他
-  const h6 = body.appendParagraph("5. その他");
+  // 6. その他
+  const h6 = body.appendParagraph("6. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
@@ -1180,10 +1265,25 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     40, 210, 880, 180, 14, false, "#94a3b8");
 
   // スライド6: 推奨アクション
+  // 課題分析スライド
+  const slIssue = pres.appendSlide();
+  clearSlide(slIssue);
+  setBg(slIssue, BG_LIGHT);
+  addBox(slIssue, "4. 課題分析", 40, 15, 880, 40, 18, true, ACCENT);
+  const issues = generateIssues(s, unitPrice, unitGoal, newRatio);
+  if (issues.length === 0) {
+    addBox(slIssue, "現時点で大きな課題は検出されませんでした。", 40, 80, 880, 60, 13, false, "#64748b");
+  } else {
+    const issueRows = [["課題", "現状", "コンサルコメント"]];
+    issues.forEach(iss => issueRows.push([iss.title, iss.detail, iss.comment]));
+    addTable(slIssue, issueRows, 20, 62, 920, Math.min(62 + issues.length * 50 + 30, 450), "#fee2e2", 10);
+  }
+
+  // 推奨アクションスライド
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "4. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
+  addBox(sl5, "5. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
   if (strategies.length > 0) {
     const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
@@ -1193,11 +1293,11 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     addBox(sl5, "施策データなし", 40, 80, 880, 60, 13, false, "#64748b");
   }
 
-  // スライド7: その他
+  // スライド: その他
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "5. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
+  addBox(sl7, "6. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
   addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
 
   pres.saveAndClose();
