@@ -928,50 +928,31 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
     return diff > 0 ? " ▲" + pct2 + "%" : diff < 0 ? " ▼" + pct2 + "%" : " →";
   };
 
-  // 1. 店舗サマリー（当月 vs 前月）
-  const h1 = body.appendParagraph("1. 店舗サマリー");
+  // 1. 数値サマリー（売上・KPI まとめて一表）
+  const h1 = body.appendParagraph("1. 数値サマリー");
   h1.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h1.editAsText().setForegroundColor("#1e40af").setBold(true);
   const prevLabel = sPrev ? prevYMStr + "実績" : "前月なし";
+  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
+  const nextResAlert = nextResPct < 35 ? " ⚠" : " ✓";
+  const unitAlert = unitPrice < 5020 ? " ⚠" : " ✓";
   const t1 = body.appendTable([
-    ["項目", "当月実績", "目標", "達成率", prevLabel, "前月比"],
-    ["売上", "¥" + fmt(s.実績売上), "¥" + fmt(s.売上目標), (s.達成率 || 0) + "%",
-      sPrev ? "¥" + fmt(sPrev.実績売上) : "—", trend(s.実績売上, sPrev?.実績売上)],
-    ["月末見込み売上", "¥" + fmt(s.見込み売上), "¥" + fmt(s.売上目標), (s.見込み達成率 || 0) + "%",
-      sPrev ? "¥" + fmt(sPrev.見込み売上) : "—", ""],
+    ["指標", "当月実績", "目標", "達成率", prevLabel, "前月比"],
+    ["売上",       "¥"+fmt(s.実績売上),       "¥"+fmt(s.売上目標),       (s.達成率||0)+"%",                         sPrev?"¥"+fmt(sPrev.実績売上):"—",                trend(s.実績売上,sPrev?.実績売上)],
+    ["月末見込",   "¥"+fmt(s.見込み売上),     "¥"+fmt(s.売上目標),       (s.見込み達成率||0)+"%",                   "—",                                              "—"],
+    ["総客数",     fmt(s.総客数実績)+"人",     fmt(s.総客数目標)+"人",    pct(s.総客数実績,s.総客数目標)+"%",       sPrev?fmt(sPrev.総客数実績)+"人":"—",             trend(s.総客数実績,sPrev?.総客数実績)],
+    ["新規客数",   fmt(s.新規実績)+"人",       fmt(s.新規目標)+"人",      pct(s.新規実績,s.新規目標)+"%",           sPrev?fmt(sPrev.新規実績)+"人":"—",               trend(s.新規実績,sPrev?.新規実績)],
+    ["再来客数",   fmt(s.再来実績)+"人",       fmt(s.再来目標)+"人",      pct(s.再来実績,s.再来目標)+"%",           sPrev?fmt(sPrev.再来実績)+"人":"—",               trend(s.再来実績,sPrev?.再来実績)],
+    ["客単価",     "¥"+fmt(s.客単価実績)+unitAlert, "¥"+fmt(s.客単価目標), pct(s.客単価実績,s.客単価目標)+"%",     sPrev?"¥"+fmt(sPrev.客単価実績):"—",             trend(s.客単価実績,sPrev?.客単価実績)],
+    ["次回予約率", nextResPct+"%"+nextResAlert,"35%以上",                 "—",                                       sPrev?Math.round((sPrev.次回予約率実績||0)*100)+"%":"—", "—"],
+    ["回数券売上", "¥"+fmt(s.回数券売上実績), "¥"+fmt(s.回数券売上目標), pct(s.回数券売上実績,s.回数券売上目標)+"%",sPrev?"¥"+fmt(sPrev.回数券売上実績):"—",         trend(s.回数券売上実績,sPrev?.回数券売上実績)],
+    ["物販売上",   "¥"+fmt(s.物販売上実績),   "BP:¥29,700",              "—",                                       sPrev?"¥"+fmt(sPrev.物販売上実績):"—",            trend(s.物販売上実績,sPrev?.物販売上実績)],
   ]);
   styleTableHeader(t1, 6, "#dbeafe");
   body.appendParagraph("");
 
-  // 2. KPI詳細（当月 vs 前月）
-  const h2 = body.appendParagraph("2. KPI詳細");
-  h2.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  h2.editAsText().setForegroundColor("#1e40af").setBold(true);
-  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
-  const nextResAlert = nextResPct < 35 ? " ⚠" : " ✓";
-  const unitAlert = unitPrice < 5020 ? " ⚠" : " ✓";
-  const t2 = body.appendTable([
-    ["指標", "当月実績", "目標", "BP基準", prevLabel, "前月比"],
-    ["総客数", fmt(s.総客数実績) + "人", fmt(s.総客数目標) + "人", "135人",
-      sPrev ? fmt(sPrev.総客数実績) + "人" : "—", trend(s.総客数実績, sPrev?.総客数実績)],
-    ["新規客数", fmt(s.新規実績) + "人", fmt(s.新規目標) + "人", "—",
-      sPrev ? fmt(sPrev.新規実績) + "人" : "—", trend(s.新規実績, sPrev?.新規実績)],
-    ["再来客数", fmt(s.再来実績) + "人", fmt(s.再来目標) + "人", "—",
-      sPrev ? fmt(sPrev.再来実績) + "人" : "—", trend(s.再来実績, sPrev?.再来実績)],
-    ["客単価", "¥" + fmt(s.客単価実績) + unitAlert, "¥" + fmt(s.客単価目標), "¥5,020",
-      sPrev ? "¥" + fmt(sPrev.客単価実績) : "—", trend(s.客単価実績, sPrev?.客単価実績)],
-    ["次回予約率", nextResPct + "%" + nextResAlert, "35%以上", "35%以上",
-      sPrev ? Math.round((sPrev.次回予約率実績||0)*100) + "%" : "—", ""],
-    ["回数券売上", "¥" + fmt(s.回数券売上実績), "¥" + fmt(s.回数券売上目標), "—",
-      sPrev ? "¥" + fmt(sPrev.回数券売上実績) : "—", trend(s.回数券売上実績, sPrev?.回数券売上実績)],
-    ["物販売上", "¥" + fmt(s.物販売上実績), "—", "¥29,700",
-      sPrev ? "¥" + fmt(sPrev.物販売上実績) : "—", trend(s.物販売上実績, sPrev?.物販売上実績)],
-  ]);
-  styleTableHeader(t2, 6, "#dbeafe");
-  body.appendParagraph("");
-
-  // 3. 顧客象限分析
-  const h3 = body.appendParagraph("3. 顧客象限分析");
+  // 2. 顧客象限分析
+  const h3 = body.appendParagraph("2. 顧客象限分析");
   h3.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h3.editAsText().setForegroundColor("#1e40af").setBold(true);
   const qPara = body.appendParagraph("現在のポジション: 【" + quadrant + "】");
@@ -987,8 +968,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環").editAsText().setFontSize(10).setForegroundColor("#64748b");
   body.appendParagraph("");
 
-  // 4. メニュー構成比
-  const h4m = body.appendParagraph("4. メニュー構成比");
+  // 3. メニュー構成比
+  const h4m = body.appendParagraph("3. メニュー構成比");
   h4m.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4m.editAsText().setForegroundColor("#1e40af").setBold(true);
   if (menuData && menuData.total > 0) {
@@ -1010,8 +991,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 5. 推奨アクション（ベストプラクティスより）
-  const h4 = body.appendParagraph("5. 推奨アクション（ベストプラクティスより）");
+  // 4. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("4. 推奨アクション（ベストプラクティスより）");
   h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4.editAsText().setForegroundColor("#1e40af").setBold(true);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
@@ -1025,8 +1006,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 6. 進行中タスク
-  const h5 = body.appendParagraph("6. 進行中タスク");
+  // 5. 進行中タスク
+  const h5 = body.appendParagraph("5. 進行中タスク");
   h5.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h5.editAsText().setForegroundColor("#1e40af").setBold(true);
   if (tasks.length === 0) {
@@ -1039,8 +1020,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 7. その他
-  const h6 = body.appendParagraph("7. その他");
+  // 6. その他
+  const h6 = body.appendParagraph("6. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
@@ -1126,55 +1107,44 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   addBox(sl1, "担当SV: " + s.sv + "　" + dateStr + "　象限:【" + quadrant + "】", 40, 260, 880, 40, 16, false, "#94a3b8");
   addBox(sl1, quadrantMsg, 40, 310, 880, 50, 13, false, "#60a5fa");
 
-  // スライド2: 店舗サマリー（テキスト左 + 達成率グラフ右）
+  // スライド2: 数値サマリー（テーブル左 + 達成率グラフ右）
   const sl2 = pres.appendSlide();
   clearSlide(sl2);
   setBg(sl2, BG_LIGHT);
-  addBox(sl2, "1. 店舗サマリー", 40, 15, 500, 40, 18, true, ACCENT);
-  if (prevL) addBox(sl2, "比較: " + prevL, 560, 15, 360, 35, 11, false, "#64748b");
+  addBox(sl2, "1. 数値サマリー", 40, 12, 500, 38, 18, true, ACCENT);
+  if (prevL) addBox(sl2, "比較: " + prevL, 560, 12, 360, 32, 11, false, "#64748b");
   const salesPct = s.達成率 || 0;
   const mkPct2 = s.見込み達成率 || 0;
-  addBox(sl2,
-    "売上実績: ¥" + fmt(s.実績売上) + "\n" +
-    "目標:　　 ¥" + fmt(s.売上目標) + "　→　" + salesPct + "%" + (sPrev ? tr(s.実績売上, sPrev.実績売上) : "") + "\n" +
-    (sPrev ? "前月実績: ¥" + fmt(sPrev.実績売上) + " (" + (sPrev.達成率||0) + "%)\n" : "") +
-    "\n月末見込: ¥" + fmt(s.見込み売上) + "　→　" + mkPct2 + "%",
-    40, 65, 410, 350, 13, false, "#1e293b");
-  // 達成率グラフ
-  const chartLabels = ["売上", "見込み", "総客数", "回数券"];
-  const chartVals = [
-    pct(s.実績売上, s.売上目標),
-    mkPct2,
-    pct(s.総客数実績, s.総客数目標),
-    pct(s.回数券売上実績, s.回数券売上目標)
-  ];
-  addChart(sl2, chartLabels, chartVals, "KPI達成率(%)", 460, 55, 480, 390);
-
-  // スライド3: KPI詳細テーブル
-  const sl3 = pres.appendSlide();
-  clearSlide(sl3);
-  setBg(sl3, BG_LIGHT);
-  addBox(sl3, "2. KPI詳細", 40, 15, 500, 40, 18, true, ACCENT);
-  if (prevL) addBox(sl3, "比較: " + prevL, 560, 15, 360, 35, 11, false, "#64748b");
   const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
   const prevNextRes = sPrev ? Math.round((sPrev.次回予約率実績||0)*100) : null;
   const kpiRows = [
-    ["指標", "当月実績", "目標", "達成率", prevL || "前月", "前月比"],
-    ["総客数",    fmt(s.総客数実績)+"人",  fmt(s.総客数目標)+"人",  pct(s.総客数実績,s.総客数目標)+"%",  sPrev?fmt(sPrev.総客数実績)+"人":"—",  sPrev?tr(s.総客数実績,sPrev.総客数実績):"—"],
-    ["新規客数",  fmt(s.新規実績)+"人",    fmt(s.新規目標)+"人",    pct(s.新規実績,s.新規目標)+"%",       sPrev?fmt(sPrev.新規実績)+"人":"—",    sPrev?tr(s.新規実績,sPrev.新規実績):"—"],
-    ["再来客数",  fmt(s.再来実績)+"人",    fmt(s.再来目標)+"人",    pct(s.再来実績,s.再来目標)+"%",       sPrev?fmt(sPrev.再来実績)+"人":"—",    sPrev?tr(s.再来実績,sPrev.再来実績):"—"],
-    ["客単価",    "¥"+fmt(s.客単価実績),   "¥"+fmt(s.客単価目標),  pct(s.客単価実績,s.客単価目標)+"%",   sPrev?"¥"+fmt(sPrev.客単価実績):"—",   sPrev?tr(s.客単価実績,sPrev.客単価実績):"—"],
-    ["次回予約率",nextResPct+"%" + (nextResPct<35?" ⚠":""),  "35%以上", "—", prevNextRes!==null?prevNextRes+"%":"—", "—"],
-    ["回数券売上","¥"+fmt(s.回数券売上実績),"¥"+fmt(s.回数券売上目標),pct(s.回数券売上実績,s.回数券売上目標)+"%",sPrev?"¥"+fmt(sPrev.回数券売上実績):"—",sPrev?tr(s.回数券売上実績,sPrev.回数券売上実績):"—"],
-    ["物販売上",  "¥"+fmt(s.物販売上実績), "BP:¥29,700", "—",         sPrev?"¥"+fmt(sPrev.物販売上実績):"—",  sPrev?tr(s.物販売上実績,sPrev.物販売上実績):"—"],
+    ["指標", "当月実績", "目標", "達成率", prevL||"前月", "前月比"],
+    ["売上",      "¥"+fmt(s.実績売上),       "¥"+fmt(s.売上目標),      salesPct+"%",                          sPrev?"¥"+fmt(sPrev.実績売上):"—",       sPrev?tr(s.実績売上,sPrev.実績売上):"—"],
+    ["月末見込",  "¥"+fmt(s.見込み売上),     "¥"+fmt(s.売上目標),      mkPct2+"%",                            "—",                                     "—"],
+    ["総客数",    fmt(s.総客数実績)+"人",     fmt(s.総客数目標)+"人",   pct(s.総客数実績,s.総客数目標)+"%",   sPrev?fmt(sPrev.総客数実績)+"人":"—",    sPrev?tr(s.総客数実績,sPrev.総客数実績):"—"],
+    ["新規",      fmt(s.新規実績)+"人",       fmt(s.新規目標)+"人",     pct(s.新規実績,s.新規目標)+"%",       sPrev?fmt(sPrev.新規実績)+"人":"—",      sPrev?tr(s.新規実績,sPrev.新規実績):"—"],
+    ["再来",      fmt(s.再来実績)+"人",       fmt(s.再来目標)+"人",     pct(s.再来実績,s.再来目標)+"%",       sPrev?fmt(sPrev.再来実績)+"人":"—",      sPrev?tr(s.再来実績,sPrev.再来実績):"—"],
+    ["客単価",    "¥"+fmt(s.客単価実績),     "¥"+fmt(s.客単価目標),   pct(s.客単価実績,s.客単価目標)+"%",   sPrev?"¥"+fmt(sPrev.客単価実績):"—",    sPrev?tr(s.客単価実績,sPrev.客単価実績):"—"],
+    ["次回予約率",nextResPct+"%" + (nextResPct<35?" ⚠":""), "35%以上", "—",                                    prevNextRes!==null?prevNextRes+"%":"—",   "—"],
+    ["回数券",    "¥"+fmt(s.回数券売上実績), "¥"+fmt(s.回数券売上目標),pct(s.回数券売上実績,s.回数券売上目標)+"%",sPrev?"¥"+fmt(sPrev.回数券売上実績):"—",sPrev?tr(s.回数券売上実績,sPrev.回数券売上実績):"—"],
+    ["物販",      "¥"+fmt(s.物販売上実績),   "BP:¥29,700",             "—",                                    sPrev?"¥"+fmt(sPrev.物販売上実績):"—",   sPrev?tr(s.物販売上実績,sPrev.物販売上実績):"—"],
   ];
-  addTable(sl3, kpiRows, 20, 62, 920, 440, "#dbeafe", 10);
+  addTable(sl2, kpiRows, 20, 56, 530, 450, "#dbeafe", 9);
+  // 達成率グラフ（右側）
+  const chartLabels = ["売上", "見込み", "総客数", "新規", "再来", "客単価", "回数券"];
+  const chartVals = [
+    salesPct, mkPct2,
+    pct(s.総客数実績,s.総客数目標), pct(s.新規実績,s.新規目標),
+    pct(s.再来実績,s.再来目標),    pct(s.客単価実績,s.客単価目標),
+    pct(s.回数券売上実績,s.回数券売上目標)
+  ];
+  addChart(sl2, chartLabels, chartVals, "達成率(%)", 565, 56, 390, 450);
 
   // スライド4: メニュー構成比
   const sl4m = pres.appendSlide();
   clearSlide(sl4m);
   setBg(sl4m, BG_LIGHT);
-  addBox(sl4m, "3. メニュー構成比", 40, 15, 500, 40, 18, true, ACCENT);
+  addBox(sl4m, "2. メニュー構成比", 40, 15, 500, 40, 18, true, ACCENT);
   if (menuData && menuData.total > 0) {
     // 円グラフ（左側）
     try {
@@ -1214,7 +1184,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   const sl4 = pres.appendSlide();
   clearSlide(sl4);
   setBg(sl4, BG_DARK);
-  addBox(sl4, "4. 顧客象限分析", 40, 20, 880, 45, 20, true, "#60a5fa");
+  addBox(sl4, "3. 顧客象限分析", 40, 20, 880, 45, 20, true, "#60a5fa");
   addBox(sl4, "現在のポジション: 【" + quadrant + "】", 40, 80, 880, 50, 22, true, "#fbbf24");
   addBox(sl4, quadrantMsg, 40, 145, 880, 50, 14, false, "#e2e8f0");
   addBox(sl4,
@@ -1227,7 +1197,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "5. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
+  addBox(sl5, "4. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
   const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
   if (strategies.length > 0) {
     const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
@@ -1241,7 +1211,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   const sl6 = pres.appendSlide();
   clearSlide(sl6);
   setBg(sl6, BG_LIGHT);
-  addBox(sl6, "6. 進行中タスク", 40, 15, 880, 40, 18, true, ACCENT);
+  addBox(sl6, "5. 進行中タスク", 40, 15, 880, 40, 18, true, ACCENT);
   if (tasks.length === 0) {
     addBox(sl6, "現在の未完了タスクはありません。", 40, 80, 880, 60, 13, false, "#64748b");
   } else {
@@ -1254,7 +1224,7 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "7. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
+  addBox(sl7, "6. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
   addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
 
   pres.saveAndClose();
