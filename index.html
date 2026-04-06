@@ -433,7 +433,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbzfcNl0ADh31D3c9dQumMZ9MRXetandr8EEDuvdblvQZUq5tWqz_1vKYo0yrZB_IXER/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbyr8Xi4miYqXdti31xgy5dwtgs_HeBdeCaqCJITfrh1MyrzeozAxC3fG9SPpJVciWNL/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
