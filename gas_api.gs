@@ -1772,6 +1772,8 @@ function getStoreReport(storeName, staffYM) {
 
     const kubun    = String(rows[i][SC_KUBUN] || "").trim();
     const category = String(rows[i][SC_CAT]   || "").trim();
+    const cat2     = String(rows[i][SC_CAT2]  || "").trim();
+    const menuKey  = cat2 || category;  // J列優先、なければI列
     const amount   = parseFloat(rows[i][SC_AMT])   || 0;
     const staff    = String(rows[i][SC_STAFF] || "").trim();
     const cnt      = parseFloat(rows[i][SC_COUNT]) || 1;
@@ -1782,26 +1784,26 @@ function getStoreReport(storeName, staffYM) {
       kubunMap[kubun].sales += amount;
       // クーポン系はカテゴリ名まで記録
       const isCoupon = kubun.includes("クーポン") || kubun.includes("割引") || kubun.includes("特典");
-      if (isCoupon && category) {
-        const detail = String(rows[i][SC_CAT2] || "").trim() || category;
-        kubunMap[kubun].details[detail] = (kubunMap[kubun].details[detail] || 0) + cnt;
+      if (isCoupon && menuKey) {
+        kubunMap[kubun].details[menuKey] = (kubunMap[kubun].details[menuKey] || 0) + cnt;
       }
     }
 
     if (!monthlyMap[ym]) monthlyMap[ym] = { sales: 0, serviceCount: 0 };
+    // 全kubunの売上を月次合計に含める
+    monthlyMap[ym].sales += amount;
 
     if (kubun === "施術") {
-      monthlyMap[ym].sales += amount;
       monthlyMap[ym].serviceCount += cnt;
 
-      if (category) {
-        if (!menuMap[category]) menuMap[category] = { count: 0, sales: 0 };
-        menuMap[category].count += cnt;
-        menuMap[category].sales += amount;
+      if (menuKey) {
+        if (!menuMap[menuKey]) menuMap[menuKey] = { count: 0, sales: 0 };
+        menuMap[menuKey].count += cnt;
+        menuMap[menuKey].sales += amount;
 
         // 月別メニュー件数
         if (!monthlyMenuMap[ym]) monthlyMenuMap[ym] = {};
-        monthlyMenuMap[ym][category] = (monthlyMenuMap[ym][category] || 0) + cnt;
+        monthlyMenuMap[ym][menuKey] = (monthlyMenuMap[ym][menuKey] || 0) + cnt;
       }
 
       if (staff) {
