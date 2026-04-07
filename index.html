@@ -353,11 +353,73 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 .btn-save{padding:8px 22px;border:none;border-radius:8px;background:var(--acc);color:#fff;font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer}
 .btn-save:hover{opacity:.85}
 .tb-no-store{padding:40px;text-align:center;color:var(--ink3);font-size:13px}
+
+/* ═══ HAMBURGER / MOBILE ═══ */
+.hamburger{display:none;width:36px;height:36px;align-items:center;justify-content:center;background:none;border:1px solid var(--bdr);border-radius:var(--r2);cursor:pointer;color:var(--ink2);flex-shrink:0}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:39}
+
+@media(max-width:768px){
+  /* SIDEBAR */
+  .sb{transform:translateX(-220px);transition:transform .25s ease;z-index:50}
+  .sb.open{transform:translateX(0)}
+  .sb-overlay.show{display:block}
+  .hamburger{display:flex}
+
+  /* MAIN */
+  .main{margin-left:0}
+  .topbar{padding:0 12px;gap:6px}
+  .pg-title{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tb-r{gap:6px}
+  .vtog{display:none}
+  .sel{font-size:12px;padding:5px 6px;max-width:100px}
+  .content{padding:12px}
+
+  /* SUMMARY CARDS */
+  .sum-grid{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+  .sc-v{font-size:20px}
+
+  /* STORE GRID */
+  .sg{grid-template-columns:1fr}
+
+  /* TASK BOARD */
+  .tbd{grid-template-columns:1fr}
+
+  /* TASK LIST – horizontal scroll */
+  .task-list{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .task-row{min-width:600px}
+
+  /* CHART GRID */
+  .chart-grid{grid-template-columns:1fr}
+  .chart-card.wide{grid-column:1}
+
+  /* ALERT */
+  .alert-summary{grid-template-columns:repeat(2,1fr)}
+  .alert-item{flex-wrap:wrap}
+
+  /* TABLES – horizontal scroll */
+  .sm-table-wrap,.svt-mob-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .smt,.svt{min-width:620px}
+
+  /* MIKOMI PAGE */
+  .mp-grid{grid-template-columns:1fr}
+  .spc-kpi-grid{grid-template-columns:repeat(2,1fr)}
+
+  /* MODAL – bottom sheet */
+  .modal-overlay{padding:0;align-items:flex-end}
+  .modal-box{border-radius:16px 16px 0 0;max-height:90vh}
+  .modal-row{grid-template-columns:1fr}
+
+  /* STORE REPORT */
+  .rpt-grid{grid-template-columns:1fr!important}
+  .rpt-sum-grid{grid-template-columns:repeat(2,1fr)!important}
+}
 </style>
 </head>
 <body>
 
-<aside class="sb">
+<div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+
+<aside class="sb" id="sb">
   <div class="sb-logo">
     <div class="sb-logo-t">SV Portal</div>
     <div class="sb-logo-s">Franchise Management</div>
@@ -414,6 +476,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 
 <div class="main">
   <div class="topbar">
+    <button class="hamburger" onclick="toggleSidebar()" aria-label="メニュー">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
     <div class="pg-title" id="pg-title">加盟店一覧</div>
     <div class="tb-r">
       <div id="sync-ind"></div>
@@ -432,6 +497,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--ink)
 </div>
 
 <script>
+function toggleSidebar(){document.getElementById('sb').classList.toggle('open');document.getElementById('sb-overlay').classList.toggle('show')}
+function closeSidebar(){document.getElementById('sb').classList.remove('open');document.getElementById('sb-overlay').classList.remove('show')}
+
 let SVC={"山田":"#2563eb","髙橋":"#7c3aed","向井":"#0891b2","子龍":"#059669","宮脇":"#c2410c"};
 const svc=sv=>SVC[sv]||"#6b7280";
 const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
@@ -1257,7 +1325,7 @@ function renderSVTable(){
   const totRoyalMk=stores.reduce((a,s)=>a+(s.見込みロイヤリティ||0),0);
   const totRoyalPct=totRoyalTgt?Math.round(totRoyal/totRoyalTgt*100):0;
   const totRoyalMkPct=totRoyalTgt?Math.round(totRoyalMk/totRoyalTgt*100):0;
-  el.innerHTML=`<table class="svt">
+  el.innerHTML=`<div class="svt-mob-wrap"><table class="svt">
     <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ実績（達成率）</th><th style="background:var(--acc2);color:var(--acc)">ロイヤリティ見込み（目標比）</th></tr></thead>
     <tbody>${rows.join("")}
     <tr style="font-weight:700;background:var(--sur2)">
@@ -1269,7 +1337,7 @@ function renderSVTable(){
       <td class="num"><div>¥${fm(totRoyal)}<span style="font-size:11px;color:${pcc(totRoyalPct)};font-weight:700;margin-left:5px">${totRoyalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(totRoyalTgt)}</div></td>
       <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(totRoyalMkPct)}">¥${fm(totRoyalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(totRoyalMkPct)}">${totRoyalMkPct}%</div></td>
     </tr></tbody>
-  </table>`;
+  </table></div>`;
 }
 
 // ─ INLINE SAVE ─
@@ -1356,6 +1424,8 @@ function showView(name,btn){
   if(name==="chart")renderChart();
   if(name==="staff")renderStaff();
   if(name==="report")renderReport();
+  // モバイルでナビ選択後にサイドバーを閉じる
+  if(window.innerWidth<=768)closeSidebar();
 }
 
 function setMode(m,btn){
