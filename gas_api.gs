@@ -80,9 +80,10 @@ function doGet(e) {
       const ym = parseInt(e.parameter.ym) || null;
       return json({ stores: getStores(ym) });
     }
-    // 店舗レポート: ?action=getStoreReport&store=店舗名
+    // 店舗レポート: ?action=getStoreReport&store=店舗名[&ym=202603]
     if (e && e.parameter && e.parameter.action === "getStoreReport") {
-      return json(getStoreReport(e.parameter.store || ""));
+      const staffYM = e.parameter.ym ? parseInt(e.parameter.ym) : null;
+      return json(getStoreReport(e.parameter.store || "", staffYM));
     }
     // アジェンダ外部ファイル生成（Google Docs/Slides）
     if (e && e.parameter && e.parameter.action === "createAgendaExternal") {
@@ -883,8 +884,8 @@ function createAgendaExternal(storeName, format, memo) {
   else                                 { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
   // メニュー比率は先月YMで取得
   const menuData = getMenuRatios(storeName, prevYM);
-  // 店舗レポート（売上明細から月別推移・スタッフ集計）
-  const storeReport = getStoreReport(storeName);
+  // 店舗レポート（売上明細から月別推移・スタッフ集計）スタッフは先月のみ
+  const storeReport = getStoreReport(storeName, prevYM);
   if (format === "slides") {
     return createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData, storeReport);
   } else {
@@ -1589,17 +1590,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
     ["回数券",    "¥"+fmt(sMain.回数券売上実績), "¥"+fmt(sMain.回数券売上目標),pct(sMain.回数券売上実績,sMain.回数券売上目標)+"%", sPrevPrev?"¥"+fmt(sPrevPrev.回数券売上実績):"—", tr(sMain.回数券売上実績, sPrevPrev?.回数券売上実績)],
     ["物販",      "¥"+fmt(sMain.物販売上実績),   "BP:¥29,700",                 "—",                                          sPrevPrev?"¥"+fmt(sPrevPrev.物販売上実績):"—",   tr(sMain.物販売上実績, sPrevPrev?.物販売上実績)],
   ];
-  const tblW = Math.round(CW * 0.52);
-  const chartW = CW - tblW - 5;
-  addTable(sl2, kpiRows, 15, CY, tblW, CH, "#dbeafe", 8);
-  const chartLabels = ["売上", "総客数", "新規", "再来", "客単価", "回数券"];
-  const chartVals = [
-    salesPct,
-    pct(sMain.総客数実績,sMain.総客数目標), pct(sMain.新規実績,sMain.新規目標),
-    pct(sMain.再来実績,sMain.再来目標),    pct(sMain.客単価実績,sMain.客単価目標),
-    pct(sMain.回数券売上実績,sMain.回数券売上目標)
-  ];
-  addChart(sl2, chartLabels, chartVals, "達成率(%)", 15 + tblW + 5, CY, chartW, CH);
+  addTable(sl2, kpiRows, 15, CY, CW, CH, "#dbeafe", 8);
 
   // スライド3: メニュー構成比
   const sl4m = pres.appendSlide();
@@ -1769,7 +1760,8 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
 /**
  * 指定店舗の売上明細から月別・メニュー・スタッフの集計を返す
  */
-function getStoreReport(storeName) {
+function getStoreReport(storeName, staffYM) {
+  // staffYM: スタッフ集計を絞り込む月（省略時は全月累計）
   if (!storeName) return { error: "店舗名が必要です" };
 
   const nameMap = _getSalesNameMap();
@@ -1815,7 +1807,8 @@ function getStoreReport(storeName) {
         menuMap[category].count += cnt;
         menuMap[category].sales += amount;
       }
-      if (staff) {
+      // スタッフは staffYM 指定時はその月のみ、省略時は全月
+      if (staff && (!staffYM || ym === staffYM)) {
         if (!staffMap[staff]) staffMap[staff] = { count: 0, sales: 0 };
         staffMap[staff].count += cnt;
         staffMap[staff].sales += amount;
