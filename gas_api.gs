@@ -25,14 +25,64 @@ function doGet(e) {
       );
       return json(result);
     }
+    // 売上データ同期実行: ?action=syncSalesData
+    if (e && e.parameter && e.parameter.action === "syncSalesData") {
+      syncSalesData();
+      return json({ ok: true, message: "同期完了" });
+    }
     // ベストプラクティス読み込み（デバッグ用）
     if (e && e.parameter && e.parameter.action === "getBestPractices") {
       return json(getBestPractices());
+    }
+    // 売上明細のユニーク店舗名一覧: ?action=listSalesStores
+    if (e && e.parameter && e.parameter.action === "listSalesStores") {
+      const ss2 = SpreadsheetApp.openById(SS_ID);
+      const ws2 = ss2.getSheetByName(SHEET_SALES);
+      if (!ws2) return json({ error: "売上明細シートなし" });
+      const rows2 = ws2.getDataRange().getValues();
+      const nameCount = {};
+      for (let i = 1; i < rows2.length; i++) {
+        const nm = String(rows2[i][0] || "").trim();
+        if (nm) nameCount[nm] = (nameCount[nm] || 0) + 1;
+      }
+      return json({ total: Object.keys(nameCount).length, stores: nameCount });
+    }
+    // メニュー比率デバッグ: ?action=debugMenu&store=店舗名&ym=202603
+    if (e && e.parameter && e.parameter.action === "debugMenu") {
+      const storeName = e.parameter.store || "";
+      const ym = parseInt(e.parameter.ym) || 202603;
+      const nameMap = _getSalesNameMap();
+      const officialName = nameMap.abbrToOfficial[storeName] || storeName;
+      const ss2 = SpreadsheetApp.openById(SS_ID);
+      const ws2 = ss2.getSheetByName(SHEET_SALES);
+      const rows2 = ws2 ? ws2.getDataRange().getValues() : [];
+      const sample = [];
+      let matchCount = 0, kubunCount = 0;
+      const ymDist = {};
+      for (let i = 1; i < rows2.length; i++) {
+        const store = String(rows2[i][0] || "").trim();
+        if (store !== officialName) continue;
+        matchCount++;
+        const kubun = String(rows2[i][5] || "").trim();
+        const rawDate = rows2[i][1];
+        const dn = parseFloat(rawDate) || 0;
+        const rowYM = Math.floor(dn / 100);
+        ymDist[rowYM] = (ymDist[rowYM] || 0) + 1;
+        const mn = (String(rows2[i][7] || "") + " " + String(rows2[i][8] || "")).trim();
+        if (sample.length < 5) sample.push({ dn, rowYM, kubun, mn });
+        if (kubun !== "施術") continue;
+        kubunCount++;
+      }
+      return json({ storeName, officialName, matchCount, kubunCount, ymDist, sample });
     }
     // 指定月の店舗データ取得
     if (e && e.parameter && e.parameter.action === "getStores") {
       const ym = parseInt(e.parameter.ym) || null;
       return json({ stores: getStores(ym) });
+    }
+    // 店舗レポート: ?action=getStoreReport&store=店舗名
+    if (e && e.parameter && e.parameter.action === "getStoreReport") {
+      return json(getStoreReport(e.parameter.store || ""));
     }
     // アジェンダ外部ファイル生成（Google Docs/Slides）
     if (e && e.parameter && e.parameter.action === "createAgendaExternal") {
@@ -369,11 +419,28 @@ function getStores(targetYM) {
   const isCurrentMonth = curYM === (today.getFullYear() * 100 + (today.getMonth() + 1));
   const elapsed = isCurrentMonth ? today.getDate() - 1 : daysInMonth;
 
+  // 加盟店目標の店舗名セット（正規化キー → 正式名称）
+  const goalNameMap = {};
+  for (let i = 1; i < rowsG.length; i++) {
+    const nm = String(rowsG[i][2] || "").trim();
+    if (nm) goalNameMap[_normalizeForMatch(nm)] = nm;
+  }
+  // 実数値・見込み数値の店舗名を加盟店目標に正規化してマッピング
+  const _resolveNm = raw => {
+    if (!raw) return raw;
+    if (goalNameMap[_normalizeForMatch(raw)]) return goalNameMap[_normalizeForMatch(raw)];
+    const normRaw = _normalizeForMatch(raw);
+    for (const [normGoal, goalNm] of Object.entries(goalNameMap)) {
+      if (normGoal.includes(normRaw) || normRaw.includes(normGoal)) return goalNm;
+    }
+    return raw;
+  };
+
   const actualMap = {};
   for (let i = 1; i < rowsR.length; i++) {
     const type = String(rowsR[i][0] || "").trim();
     if (type && type !== "加盟") continue;
-    const nm = String(rowsR[i][2] || "").trim();
+    const nm = _resolveNm(String(rowsR[i][2] || "").trim());
     if (!nm) continue;
     const dv = Math.round(parseFloat(rowsR[i][3]) || 0);
     if (dv >= 200001 && dv !== curYM) continue;
@@ -382,7 +449,7 @@ function getStores(targetYM) {
 
   const mikomiMap = {};
   for (let i = 1; i < rowsM.length; i++) {
-    const nm = String(rowsM[i][2] || "").trim();
+    const nm = _resolveNm(String(rowsM[i][2] || "").trim());
     if (!nm) continue;
     const dv = Math.round(parseFloat(rowsM[i][3]) || 0);
     if (dv >= 200001 && dv !== curYM) continue;
@@ -485,6 +552,8 @@ function getStaffSales() {
   const ws = ss.getSheetByName(SHEET_SALES);
   if (!ws) return [];
   const rows = ws.getDataRange().getValues();
+  // 正式名称 → 略称に変換してSVポータルと名称を統一
+  const nameMap = _getSalesNameMap();
   const map = {};
   for (let i = 1; i < rows.length; i++) {
     const kubun    = String(rows[i][5] || "").trim();
@@ -494,7 +563,9 @@ function getStaffSales() {
     const amt      = parseFloat(rows[i][12]) || 0;
     const cnt      = parseFloat(rows[i][11]) || 1;
     const dateNum  = parseFloat(rows[i][1]) || 0;
-    const store    = String(rows[i][0] || "").trim();
+    const storeOfficial = String(rows[i][0] || "").trim();
+    // 正式名称を略称にマッピング（見つからなければそのまま）
+    const store = nameMap.officialToAbbr[storeOfficial] || storeOfficial;
     if (!store || !staffRaw || staffRaw === "フリー 指名なし") continue;
     const month = Math.floor(dateNum / 100) % 100;
     const key = store + "|" + staffRaw;
@@ -781,6 +852,10 @@ function createAgendaExternal(storeName, format, memo) {
   const prevDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   const prevYM = prevDate.getFullYear() * 100 + (prevDate.getMonth() + 1);
   const prevYMStr = Utilities.formatDate(prevDate, "Asia/Tokyo", "yyyy年M月");
+  // 2ヶ月前（比較用）
+  const prevPrevDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+  const prevPrevYM = prevPrevDate.getFullYear() * 100 + (prevPrevDate.getMonth() + 1);
+  const prevPrevYMStr = Utilities.formatDate(prevPrevDate, "Asia/Tokyo", "yyyy年M月");
 
   const stores = getStores(curYM);
   const s = stores.find(st => st.name === storeName);
@@ -788,6 +863,9 @@ function createAgendaExternal(storeName, format, memo) {
 
   const prevStores = getStores(prevYM);
   const sPrev = prevStores.find(st => st.name === storeName) || null;
+
+  const prevPrevStores = getStores(prevPrevYM);
+  const sPrevPrev = prevPrevStores.find(st => st.name === storeName) || null;
 
   const tasks = getTasks().filter(t => t.store === storeName && t.status !== "完了");
   const title = storeName + " オーナーMTGアジェンダ " + prevYMStr + "振り返り";
@@ -807,10 +885,12 @@ function createAgendaExternal(storeName, format, memo) {
   else                                 { quadrant = "リピーター"; quadrantMsg = "低単価×再来中心。単価アップの提案強化を。"; }
   // メニュー比率は先月YMで取得
   const menuData = getMenuRatios(storeName, prevYM);
+  // 店舗レポート（売上明細から月別推移・スタッフ集計）
+  const storeReport = getStoreReport(storeName);
   if (format === "slides") {
-    return createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData);
+    return createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData, storeReport);
   } else {
-    return createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData);
+    return createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData, storeReport);
   }
 }
 
@@ -823,9 +903,12 @@ function getMenuRatios(storeName, targetYM) {
     const rows = ws.getDataRange().getValues();
     const counts = { matsu:0, mayu:0, matsuMayu:0, matsuMayuPerm:0, other:0 };
     const amounts = { matsu:0, mayu:0, matsuMayu:0, matsuMayuPerm:0, other:0 };
+    // 略称 → 正式名称に変換して売上明細を検索
+    const nameMap = _getSalesNameMap();
+    const officialName = nameMap.abbrToOfficial[storeName] || storeName;
     for (let i = 1; i < rows.length; i++) {
       const store = String(rows[i][0] || "").trim();
-      if (store !== storeName) continue;
+      if (store !== officialName) continue;
       const kubun = String(rows[i][5] || "").trim();
       if (kubun !== "施術") continue;
       if (targetYM) {
@@ -835,9 +918,19 @@ function getMenuRatios(storeName, targetYM) {
       const mn = (String(rows[i][7] || "") + " " + String(rows[i][8] || "")).trim();
       const cnt = parseFloat(rows[i][11]) || 1;
       const amt = parseFloat(rows[i][12]) || 0;
-      const hasMatsu   = mn.includes("まつ毛パーマ") || mn.includes("マツパ") || mn.includes("まつパ");
-      const hasMayuWax = mn.includes("眉毛ワックス") || mn.includes("眉ワックス");
-      const hasMayuPerm= mn.includes("眉毛パーマ")  || mn.includes("眉パーマ");
+      const mnL = mn.toLowerCase();
+      const hasMatsu   = mnL.includes("まつ毛パーマ") || mnL.includes("マツパ") || mnL.includes("まつパ")
+                      || mnL.includes("パリジェンヌ") || mnL.includes("ラッシュリフト") || mnL.includes("lash lift")
+                      || mnL.includes("ラッシュ") || mnL.includes("lash") || mnL.includes("まつげパーマ")
+                      || mnL.includes("まつ毛リフト") || mnL.includes("まつげリフト");
+      const hasMayuWax = mnL.includes("眉毛ワックス") || mnL.includes("眉ワックス")
+                      || mnL.includes("眉毛wax") || mnL.includes("眉wax")
+                      || mnL.includes("眉毛wax") || mnL.includes("眉毛wax")
+                      || mnL.includes("眉毛wax") || mnL.includes("まゆwax")
+                      || (mnL.includes("眉") && (mnL.includes("wax") || mnL.includes("ワックス")));
+      const hasMayuPerm= mnL.includes("眉毛パーマ") || mnL.includes("眉パーマ")
+                      || mnL.includes("眉毛perm") || mnL.includes("ブロウラミネーション")
+                      || mnL.includes("brow lamination");
       let k;
       if      (hasMatsu && hasMayuPerm) k = "matsuMayuPerm";
       else if (hasMatsu && hasMayuWax)  k = "matsuMayu";
@@ -856,6 +949,239 @@ function getMenuRatios(storeName, targetYM) {
     Logger.log("getMenuRatios error: " + e);
     return null;
   }
+}
+
+// ─ 実数値シートの店舗名診断（GASエディタから実行） ─
+function diagnoseActualSheetNames() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const wsGoal = ss.getSheetByName(SHEET_GOAL);
+  const wsReal = ss.getSheetByName(SHEET_REAL);
+  if (!wsGoal || !wsReal) { Logger.log("シートが見つかりません"); return; }
+
+  const goalRows = wsGoal.getDataRange().getValues();
+  const realRows = wsReal.getDataRange().getValues();
+
+  const officialNames = new Set();
+  for (let i = 1; i < goalRows.length; i++) {
+    const nm = String(goalRows[i][2] || "").trim();
+    if (nm) officialNames.add(nm);
+  }
+
+  const realNames = new Set();
+  for (let i = 1; i < realRows.length; i++) {
+    const nm = String(realRows[i][2] || "").trim();
+    if (nm) realNames.add(nm);
+  }
+
+  Logger.log("=== 加盟店目標の店舗名 ===");
+  Array.from(officialNames).sort().forEach(n => Logger.log(" ○ " + n));
+
+  Logger.log("\n=== 実数値シートで不一致の店舗名 ===");
+  const unmatch = Array.from(realNames).filter(n => !officialNames.has(n)).sort();
+  if (unmatch.length === 0) {
+    Logger.log("  → 全て一致しています");
+  } else {
+    unmatch.forEach(n => {
+      const norm = _normalizeForMatch(n);
+      const candidates = Array.from(officialNames).filter(o => {
+        const on = _normalizeForMatch(o);
+        return on.includes(norm) || norm.includes(on);
+      });
+      Logger.log(" ✕ 「" + n + "」→ 候補: " + (candidates.length ? candidates.join(" / ") : "なし"));
+    });
+  }
+}
+
+// 実数値シートのC列店舗名を正式名称に一括置換
+function fixActualSheetStoreNames(preview) {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const wsGoal = ss.getSheetByName(SHEET_GOAL);
+  const wsReal = ss.getSheetByName(SHEET_REAL);
+  if (!wsGoal || !wsReal) { Logger.log("シートが見つかりません"); return; }
+
+  const goalRows = wsGoal.getDataRange().getValues();
+  const officialNames = [];
+  for (let i = 1; i < goalRows.length; i++) {
+    const nm = String(goalRows[i][2] || "").trim();
+    if (nm && !officialNames.includes(nm)) officialNames.push(nm);
+  }
+
+  const realData = wsReal.getDataRange().getValues();
+  let fixCount = 0;
+
+  for (let i = 1; i < realData.length; i++) {
+    const raw = String(realData[i][2] || "").trim();
+    if (!raw || officialNames.includes(raw)) continue;
+
+    const norm = _normalizeForMatch(raw);
+    let best = null;
+    for (const o of officialNames) {
+      const on = _normalizeForMatch(o);
+      if (on === norm || on.includes(norm) || norm.includes(on)) {
+        if (!best || o.length > best.length) best = o;
+      }
+    }
+    if (best) {
+      Logger.log("行" + (i+1) + ": 「" + raw + "」→「" + best + "」");
+      if (!preview) wsReal.getRange(i + 1, 3).setValue(best);
+      fixCount++;
+    } else {
+      Logger.log("行" + (i+1) + ": 「" + raw + "」→ 候補なし");
+    }
+  }
+  Logger.log((preview ? "[プレビュー] " : "[実行済み] ") + "変更件数: " + fixCount);
+}
+
+// ─ 店舗名正規化ユーティリティ ─
+function _normalizeForMatch(name) {
+  return name.replace(/\s/g, "").replace(/店$/,"").replace(/（.*?）/g,"").replace(/\(.*?\)/g,"").toLowerCase();
+}
+
+// 売上明細の店舗名と正式名称の差異を確認（GASエディタから実行→ログ参照）
+function diagnoseStoreNames() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const wsGoal = ss.getSheetByName(SHEET_GOAL);
+  const wsSales = ss.getSheetByName(SHEET_SALES);
+  if (!wsGoal || !wsSales) { Logger.log("シートが見つかりません"); return; }
+
+  // 正式名称一覧（加盟店目標 C列）
+  const goalRows = wsGoal.getDataRange().getValues();
+  const officialNames = new Set();
+  for (let i = 1; i < goalRows.length; i++) {
+    const nm = String(goalRows[i][2] || "").trim();
+    if (nm) officialNames.add(nm);
+  }
+
+  // 売上明細の店舗名一覧（A列）
+  const salesRows = wsSales.getDataRange().getValues();
+  const salesNames = new Set();
+  for (let i = 1; i < salesRows.length; i++) {
+    const nm = String(salesRows[i][0] || "").trim();
+    if (nm) salesNames.add(nm);
+  }
+
+  Logger.log("=== 正式名称（加盟店目標）===");
+  Array.from(officialNames).sort().forEach(n => Logger.log(" ○ " + n));
+
+  Logger.log("\n=== 売上明細の店舗名（正式名称と不一致のもの）===");
+  const unmatch = Array.from(salesNames).filter(n => !officialNames.has(n)).sort();
+  if (unmatch.length === 0) {
+    Logger.log("  → 全て一致しています");
+  } else {
+    unmatch.forEach(n => {
+      // 類似候補を探す
+      const norm = _normalizeForMatch(n);
+      const candidates = Array.from(officialNames).filter(o => {
+        const on = _normalizeForMatch(o);
+        return on.includes(norm) || norm.includes(on);
+      });
+      Logger.log(" ✕ 「" + n + "」→ 候補: " + (candidates.length ? candidates.join(" / ") : "なし"));
+    });
+  }
+  Logger.log("\n正式名称にない売上明細の名前: " + unmatch.length + "件");
+}
+
+// 売上明細A列の店舗名を、同シート内で最も長い（正式な）名前に統一
+// preview=true でログ確認のみ、引数なし or false で実際に書き込み
+function fixSalesStoreNames(preview) {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const wsSales = ss.getSheetByName(SHEET_SALES);
+  if (!wsSales) { Logger.log("売上明細シートが見つかりません"); return; }
+
+  const salesData = wsSales.getDataRange().getValues();
+
+  // ① 売上明細内のユニーク店舗名を収集
+  const allNames = [];
+  for (let i = 1; i < salesData.length; i++) {
+    const nm = String(salesData[i][0] || "").trim();
+    if (nm && !allNames.includes(nm)) allNames.push(nm);
+  }
+
+  // ② ファジーマッチでグループ化し、最長名を正式名称とする
+  const officialMap = {}; // 各名前 → 正式名称
+  const processed = new Set();
+  for (const name of allNames) {
+    if (processed.has(name)) continue;
+    const group = [name];
+    const normName = _normalizeForMatch(name);
+    for (const other of allNames) {
+      if (other === name || processed.has(other)) continue;
+      const normOther = _normalizeForMatch(other);
+      if (normName === normOther || normName.includes(normOther) || normOther.includes(normName)) {
+        group.push(other);
+      }
+    }
+    // 最長の名前を正式名称に採用
+    const official = group.slice().sort((a, b) => b.length - a.length)[0];
+    Logger.log("グループ: [" + group.join(" / ") + "] → 正式名称:「" + official + "」");
+    group.forEach(n => { officialMap[n] = official; processed.add(n); });
+  }
+
+  // ③ 略称行を正式名称に書き換え
+  let fixCount = 0;
+  for (let i = 1; i < salesData.length; i++) {
+    const raw = String(salesData[i][0] || "").trim();
+    if (!raw) continue;
+    const official = officialMap[raw];
+    if (official && official !== raw) {
+      Logger.log("行" + (i+1) + ": 「" + raw + "」→「" + official + "」");
+      if (!preview) wsSales.getRange(i + 1, 1).setValue(official);
+      fixCount++;
+    }
+  }
+
+  Logger.log((preview ? "[プレビュー] " : "[実行済み] ") + "変更件数: " + fixCount);
+}
+
+// ─ 店舗名マッピング（略称 ↔ 正式名称） ─
+// SVポータル各シート: 略称  /  売上明細: 正式名称
+// 実行ごとにキャッシュを保持
+let _salesNameCache = null;
+function _getSalesNameMap() {
+  if (_salesNameCache) return _salesNameCache;
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const wsGoal  = ss.getSheetByName(SHEET_GOAL);
+  const wsSales = ss.getSheetByName(SHEET_SALES);
+  const abbrToOfficial = {};
+  const officialToAbbr = {};
+  if (!wsGoal || !wsSales) {
+    _salesNameCache = { abbrToOfficial, officialToAbbr };
+    return _salesNameCache;
+  }
+  // 略称一覧（加盟店目標 C列）
+  const abbrNames = [];
+  wsGoal.getDataRange().getValues().slice(1).forEach(r => {
+    const nm = String(r[2] || "").trim();
+    if (nm && !abbrNames.includes(nm)) abbrNames.push(nm);
+  });
+  // 正式名称一覧（売上明細 A列）
+  const officialNames = new Set();
+  wsSales.getDataRange().getValues().slice(1).forEach(r => {
+    const nm = String(r[0] || "").trim();
+    if (nm) officialNames.add(nm);
+  });
+  // 略称 → 正式名称マッピング（ファジーマッチ）
+  for (const abbr of abbrNames) {
+    if (officialNames.has(abbr)) {
+      abbrToOfficial[abbr] = abbr;
+      officialToAbbr[abbr] = abbr;
+      continue;
+    }
+    const normAbbr = _normalizeForMatch(abbr);
+    let best = null;
+    for (const official of officialNames) {
+      const normOfficial = _normalizeForMatch(official);
+      if (normOfficial === normAbbr || normOfficial.includes(normAbbr) || normAbbr.includes(normOfficial)) {
+        if (!best || official.length > best.length) best = official;
+      }
+    }
+    if (best) {
+      abbrToOfficial[abbr] = best;
+      officialToAbbr[best] = abbr;
+    }
+  }
+  _salesNameCache = { abbrToOfficial, officialToAbbr };
+  return _salesNameCache;
 }
 
 // ─ 課題自動判定（コンサルタント目線） ─
@@ -976,7 +1302,7 @@ function styleTableHeader(table, cols, bgColor) {
   }
 }
 
-function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData) {
+function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData, storeReport) {
   const doc = DocumentApp.create(title);
   const body = doc.getBody();
   body.clear();
@@ -986,6 +1312,7 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   const fmt = n => Math.round(n || 0).toLocaleString();
   const newPct = Math.round(newRatio * 100);
   const pct = (a, b) => b > 0 ? Math.round(a / b * 100) + "%" : "—";
+  const sMain = sPrev || s;  // 振り返り対象月（先月）
 
   // タイトル
   const titlePara = body.appendParagraph(title);
@@ -996,31 +1323,30 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   body.appendParagraph("");
 
   const trend = (cur, prev) => {
-    if (!prev || prev === 0) return "";
+    if (cur == null || prev == null || prev === 0) return "—";
     const diff = cur - prev;
     const pct2 = Math.round(Math.abs(diff) / prev * 100);
-    return diff > 0 ? " ▲" + pct2 + "%" : diff < 0 ? " ▼" + pct2 + "%" : " →";
+    return diff > 0 ? "▲" + pct2 + "%" : diff < 0 ? "▼" + pct2 + "%" : "→";
   };
 
-  // 1. 数値サマリー（売上・KPI まとめて一表）
-  const h1 = body.appendParagraph("1. 数値サマリー");
+  // 1. 数値サマリー（振り返り月 vs 比較月）
+  const h1 = body.appendParagraph("1. 数値サマリー（" + prevYMStr + " 振り返り）");
   h1.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h1.editAsText().setForegroundColor("#1e40af").setBold(true);
-  const prevLabel = sPrev ? prevYMStr + "実績" : "前月なし";
-  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
+  const prevPrevLabel = sPrevPrev ? prevPrevYMStr + "実績" : "2ヶ月前";
+  const nextResPct = Math.round((sMain.次回予約率実績 || 0) * 100);
   const nextResAlert = nextResPct < 35 ? " ⚠" : " ✓";
   const unitAlert = unitPrice < 5020 ? " ⚠" : " ✓";
   const t1 = body.appendTable([
-    ["指標", "当月実績", "目標", "達成率", prevLabel, "前月比"],
-    ["売上",       "¥"+fmt(s.実績売上),       "¥"+fmt(s.売上目標),       (s.達成率||0)+"%",                         sPrev?"¥"+fmt(sPrev.実績売上):"—",                trend(s.実績売上,sPrev?.実績売上)],
-    ["月末見込",   "¥"+fmt(s.見込み売上),     "¥"+fmt(s.売上目標),       (s.見込み達成率||0)+"%",                   "—",                                              "—"],
-    ["総客数",     fmt(s.総客数実績)+"人",     fmt(s.総客数目標)+"人",    pct(s.総客数実績,s.総客数目標)+"%",       sPrev?fmt(sPrev.総客数実績)+"人":"—",             trend(s.総客数実績,sPrev?.総客数実績)],
-    ["新規客数",   fmt(s.新規実績)+"人",       fmt(s.新規目標)+"人",      pct(s.新規実績,s.新規目標)+"%",           sPrev?fmt(sPrev.新規実績)+"人":"—",               trend(s.新規実績,sPrev?.新規実績)],
-    ["再来客数",   fmt(s.再来実績)+"人",       fmt(s.再来目標)+"人",      pct(s.再来実績,s.再来目標)+"%",           sPrev?fmt(sPrev.再来実績)+"人":"—",               trend(s.再来実績,sPrev?.再来実績)],
-    ["客単価",     "¥"+fmt(s.客単価実績)+unitAlert, "¥"+fmt(s.客単価目標), pct(s.客単価実績,s.客単価目標)+"%",     sPrev?"¥"+fmt(sPrev.客単価実績):"—",             trend(s.客単価実績,sPrev?.客単価実績)],
-    ["次回予約率", nextResPct+"%"+nextResAlert,"35%以上",                 "—",                                       sPrev?Math.round((sPrev.次回予約率実績||0)*100)+"%":"—", "—"],
-    ["回数券売上", "¥"+fmt(s.回数券売上実績), "¥"+fmt(s.回数券売上目標), pct(s.回数券売上実績,s.回数券売上目標)+"%",sPrev?"¥"+fmt(sPrev.回数券売上実績):"—",         trend(s.回数券売上実績,sPrev?.回数券売上実績)],
-    ["物販売上",   "¥"+fmt(s.物販売上実績),   "BP:¥29,700",              "—",                                       sPrev?"¥"+fmt(sPrev.物販売上実績):"—",            trend(s.物販売上実績,sPrev?.物販売上実績)],
+    ["指標", prevYMStr+"実績", "目標", "達成率", prevPrevLabel, "前月比"],
+    ["売上",       "¥"+fmt(sMain.実績売上),       "¥"+fmt(sMain.売上目標),       (sMain.達成率||0)+"%",                           sPrevPrev?"¥"+fmt(sPrevPrev.実績売上):"—",         trend(sMain.実績売上, sPrevPrev?.実績売上)],
+    ["総客数",     fmt(sMain.総客数実績)+"人",     fmt(sMain.総客数目標)+"人",    pct(sMain.総客数実績,sMain.総客数目標)+"%",       sPrevPrev?fmt(sPrevPrev.総客数実績)+"人":"—",      trend(sMain.総客数実績, sPrevPrev?.総客数実績)],
+    ["新規客数",   fmt(sMain.新規実績)+"人",       fmt(sMain.新規目標)+"人",      pct(sMain.新規実績,sMain.新規目標)+"%",           sPrevPrev?fmt(sPrevPrev.新規実績)+"人":"—",        trend(sMain.新規実績, sPrevPrev?.新規実績)],
+    ["再来客数",   fmt(sMain.再来実績)+"人",       fmt(sMain.再来目標)+"人",      pct(sMain.再来実績,sMain.再来目標)+"%",           sPrevPrev?fmt(sPrevPrev.再来実績)+"人":"—",        trend(sMain.再来実績, sPrevPrev?.再来実績)],
+    ["客単価",     "¥"+fmt(sMain.客単価実績)+unitAlert, "¥"+fmt(sMain.客単価目標), pct(sMain.客単価実績,sMain.客単価目標)+"%",     sPrevPrev?"¥"+fmt(sPrevPrev.客単価実績):"—",       trend(sMain.客単価実績, sPrevPrev?.客単価実績)],
+    ["次回予約率", nextResPct+"%"+nextResAlert,    "35%以上",                     "—",                                             sPrevPrev?Math.round((sPrevPrev.次回予約率実績||0)*100)+"%":"—", "—"],
+    ["回数券売上", "¥"+fmt(sMain.回数券売上実績), "¥"+fmt(sMain.回数券売上目標), pct(sMain.回数券売上実績,sMain.回数券売上目標)+"%", sPrevPrev?"¥"+fmt(sPrevPrev.回数券売上実績):"—",  trend(sMain.回数券売上実績, sPrevPrev?.回数券売上実績)],
+    ["物販売上",   "¥"+fmt(sMain.物販売上実績),   "BP:¥29,700",                  "—",                                             sPrevPrev?"¥"+fmt(sPrevPrev.物販売上実績):"—",     trend(sMain.物販売上実績, sPrevPrev?.物販売上実績)],
   ]);
   styleTableHeader(t1, 6, "#dbeafe");
   body.appendParagraph("");
@@ -1065,8 +1391,43 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 4. 課題分析
-  const h4i = body.appendParagraph("4. 課題分析");
+  // 4. スタッフ別売上
+  const h4s = body.appendParagraph("4. スタッフ別売上");
+  h4s.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h4s.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const rptStaff = storeReport && storeReport.staff && storeReport.staff.length > 0 ? storeReport.staff : null;
+  if (rptStaff) {
+    const staffRows = [["スタッフ名", "施術数", "売上"]];
+    rptStaff.slice(0, 10).forEach(st => staffRows.push([st.name, st.count + "件", "¥" + Math.round(st.sales).toLocaleString()]));
+    const ts4 = body.appendTable(staffRows);
+    styleTableHeader(ts4, 3, "#e0f2fe");
+  } else {
+    body.appendParagraph("スタッフデータなし").editAsText().setFontSize(11);
+  }
+  body.appendParagraph("");
+
+  // 5. 月別推移（売上明細より）
+  const h5m = body.appendParagraph("5. 月別推移（9〜3月）");
+  h5m.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  h5m.editAsText().setForegroundColor("#1e40af").setBold(true);
+  const rptMonthly = storeReport && storeReport.monthly && storeReport.monthly.length > 0 ? storeReport.monthly : null;
+  if (rptMonthly) {
+    const mRows = [["月", "売上", "施術数", "客単価"]];
+    rptMonthly.forEach(m => mRows.push([
+      m.label,
+      "¥" + Math.round(m.sales).toLocaleString(),
+      m.serviceCount + "件",
+      "¥" + Math.round(m.unitPrice).toLocaleString()
+    ]));
+    const tm5 = body.appendTable(mRows);
+    styleTableHeader(tm5, 4, "#fef9c3");
+  } else {
+    body.appendParagraph("月別データなし").editAsText().setFontSize(11);
+  }
+  body.appendParagraph("");
+
+  // 6. 課題分析
+  const h4i = body.appendParagraph("6. 課題分析");
   h4i.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4i.editAsText().setForegroundColor("#1e40af").setBold(true);
   const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
@@ -1080,11 +1441,11 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 5. 推奨アクション（ベストプラクティスより）
-  const h4 = body.appendParagraph("5. 推奨アクション（ベストプラクティスより）");
+  // 7. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("7. 推奨アクション（ベストプラクティスより）");
   h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4.editAsText().setForegroundColor("#1e40af").setBold(true);
-  const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
+  const strategies = getRelevantStrategies(quadrant, { nextRes: sMain.次回予約率実績 || 0, unitPrice, newGuest: sMain.新規実績 || 0 });
   if (strategies.length === 0) {
     body.appendParagraph("施策データなし");
   } else {
@@ -1095,8 +1456,8 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   }
   body.appendParagraph("");
 
-  // 6. その他
-  const h6 = body.appendParagraph("6. その他");
+  // 8. その他
+  const h6 = body.appendParagraph("8. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
@@ -1109,7 +1470,7 @@ function createAgendaDoc(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMs
   return doc.getUrl();
 }
 
-function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData) {
+function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, tasks, quadrant, quadrantMsg, memo, newRatio, unitPrice, unitGoal, menuData, storeReport) {
   const pres = SlidesApp.create(title);
   const BG_DARK = "#0f172a";
   const BG_LIGHT = "#f8fafc";
@@ -1177,61 +1538,71 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
   }
 
   const tr = (cur, prev) => {
-    if (!prev || prev === 0) return "";
+    if (cur == null || prev == null || prev === 0) return "—";
     const d = cur - prev;
     const p = Math.round(Math.abs(d) / prev * 100);
-    return d > 0 ? " ▲" + p + "%" : d < 0 ? " ▼" + p + "%" : " →";
+    return d > 0 ? "▲" + p + "%" : d < 0 ? "▼" + p + "%" : "→";
   };
-  const prevL = sPrev ? prevYMStr : "";
+  const sMain = sPrev || s;  // 振り返り対象月（先月）
+  const prevPrevL = sPrevPrev ? prevPrevYMStr : "2ヶ月前";
+
+  // スライドサイズ取得（720×405 標準）
+  const PW = pres.getPageWidth();
+  const PH = pres.getPageHeight();
+  const CW = PW - 30;  // 両端15ptマージン
+  const TH = 38;       // タイトル高さ
+  const TY = 10;       // タイトルY
+  const CY = TY + TH + 5; // コンテンツ開始Y
+  const CH = PH - CY - 10; // コンテンツ高さ
 
   // スライド1: タイトル
   const sl1 = pres.getSlides()[0];
   clearSlide(sl1);
   setBg(sl1, BG_DARK);
-  addBox(sl1, title, 40, 140, 880, 100, 26, true, "#ffffff");
-  addBox(sl1, "担当SV: " + s.sv + "　" + dateStr + "　象限:【" + quadrant + "】", 40, 260, 880, 40, 16, false, "#94a3b8");
-  addBox(sl1, quadrantMsg, 40, 310, 880, 50, 13, false, "#60a5fa");
+  addBox(sl1, title, 20, Math.round(PH*0.25), CW, Math.round(PH*0.22), 22, true, "#ffffff");
+  addBox(sl1, "担当SV: " + s.sv + "　" + dateStr + "　象限:【" + quadrant + "】", 20, Math.round(PH*0.52), CW, 35, 14, false, "#94a3b8");
+  addBox(sl1, quadrantMsg, 20, Math.round(PH*0.63), CW, 40, 12, false, "#60a5fa");
 
   // スライド2: 数値サマリー（テーブル左 + 達成率グラフ右）
   const sl2 = pres.appendSlide();
   clearSlide(sl2);
   setBg(sl2, BG_LIGHT);
-  addBox(sl2, "1. 数値サマリー", 40, 12, 500, 38, 18, true, ACCENT);
-  if (prevL) addBox(sl2, "比較: " + prevL, 560, 12, 360, 32, 11, false, "#64748b");
-  const salesPct = s.達成率 || 0;
-  const mkPct2 = s.見込み達成率 || 0;
-  const nextResPct = Math.round((s.次回予約率実績 || 0) * 100);
-  const prevNextRes = sPrev ? Math.round((sPrev.次回予約率実績||0)*100) : null;
+  addBox(sl2, "1. 数値サマリー（" + prevYMStr + " 振り返り）", 15, TY, Math.round(CW*0.65), TH, 14, true, ACCENT);
+  addBox(sl2, "比較: " + prevPrevL, Math.round(CW*0.67), TY, Math.round(CW*0.33), TH, 10, false, "#64748b");
+  const salesPct = sMain.達成率 || 0;
+  const nextResPct = Math.round((sMain.次回予約率実績 || 0) * 100);
+  const prevPrevNextRes = sPrevPrev ? Math.round((sPrevPrev.次回予約率実績||0)*100) : null;
   const kpiRows = [
-    ["指標", "当月実績", "目標", "達成率", prevL||"前月", "前月比"],
-    ["売上",      "¥"+fmt(s.実績売上),       "¥"+fmt(s.売上目標),      salesPct+"%",                          sPrev?"¥"+fmt(sPrev.実績売上):"—",       sPrev?tr(s.実績売上,sPrev.実績売上):"—"],
-    ["月末見込",  "¥"+fmt(s.見込み売上),     "¥"+fmt(s.売上目標),      mkPct2+"%",                            "—",                                     "—"],
-    ["総客数",    fmt(s.総客数実績)+"人",     fmt(s.総客数目標)+"人",   pct(s.総客数実績,s.総客数目標)+"%",   sPrev?fmt(sPrev.総客数実績)+"人":"—",    sPrev?tr(s.総客数実績,sPrev.総客数実績):"—"],
-    ["新規",      fmt(s.新規実績)+"人",       fmt(s.新規目標)+"人",     pct(s.新規実績,s.新規目標)+"%",       sPrev?fmt(sPrev.新規実績)+"人":"—",      sPrev?tr(s.新規実績,sPrev.新規実績):"—"],
-    ["再来",      fmt(s.再来実績)+"人",       fmt(s.再来目標)+"人",     pct(s.再来実績,s.再来目標)+"%",       sPrev?fmt(sPrev.再来実績)+"人":"—",      sPrev?tr(s.再来実績,sPrev.再来実績):"—"],
-    ["客単価",    "¥"+fmt(s.客単価実績),     "¥"+fmt(s.客単価目標),   pct(s.客単価実績,s.客単価目標)+"%",   sPrev?"¥"+fmt(sPrev.客単価実績):"—",    sPrev?tr(s.客単価実績,sPrev.客単価実績):"—"],
-    ["次回予約率",nextResPct+"%" + (nextResPct<35?" ⚠":""), "35%以上", "—",                                    prevNextRes!==null?prevNextRes+"%":"—",   "—"],
-    ["回数券",    "¥"+fmt(s.回数券売上実績), "¥"+fmt(s.回数券売上目標),pct(s.回数券売上実績,s.回数券売上目標)+"%",sPrev?"¥"+fmt(sPrev.回数券売上実績):"—",sPrev?tr(s.回数券売上実績,sPrev.回数券売上実績):"—"],
-    ["物販",      "¥"+fmt(s.物販売上実績),   "BP:¥29,700",             "—",                                    sPrev?"¥"+fmt(sPrev.物販売上実績):"—",   sPrev?tr(s.物販売上実績,sPrev.物販売上実績):"—"],
+    ["指標", prevYMStr+"実績", "目標", "達成率", prevPrevL, "前月比"],
+    ["売上",      "¥"+fmt(sMain.実績売上),       "¥"+fmt(sMain.売上目標),      salesPct+"%",                                sPrevPrev?"¥"+fmt(sPrevPrev.実績売上):"—",       tr(sMain.実績売上, sPrevPrev?.実績売上)],
+    ["総客数",    fmt(sMain.総客数実績)+"人",     fmt(sMain.総客数目標)+"人",   pct(sMain.総客数実績,sMain.総客数目標)+"%",  sPrevPrev?fmt(sPrevPrev.総客数実績)+"人":"—",    tr(sMain.総客数実績, sPrevPrev?.総客数実績)],
+    ["新規",      fmt(sMain.新規実績)+"人",       fmt(sMain.新規目標)+"人",     pct(sMain.新規実績,sMain.新規目標)+"%",      sPrevPrev?fmt(sPrevPrev.新規実績)+"人":"—",      tr(sMain.新規実績, sPrevPrev?.新規実績)],
+    ["再来",      fmt(sMain.再来実績)+"人",       fmt(sMain.再来目標)+"人",     pct(sMain.再来実績,sMain.再来目標)+"%",      sPrevPrev?fmt(sPrevPrev.再来実績)+"人":"—",      tr(sMain.再来実績, sPrevPrev?.再来実績)],
+    ["客単価",    "¥"+fmt(sMain.客単価実績),     "¥"+fmt(sMain.客単価目標),   pct(sMain.客単価実績,sMain.客単価目標)+"%",  sPrevPrev?"¥"+fmt(sPrevPrev.客単価実績):"—",    tr(sMain.客単価実績, sPrevPrev?.客単価実績)],
+    ["次回予約率",nextResPct+"%" + (nextResPct<35?" ⚠":""), "35%以上", "—",                                                  prevPrevNextRes!==null?prevPrevNextRes+"%":"—",   "—"],
+    ["回数券",    "¥"+fmt(sMain.回数券売上実績), "¥"+fmt(sMain.回数券売上目標),pct(sMain.回数券売上実績,sMain.回数券売上目標)+"%", sPrevPrev?"¥"+fmt(sPrevPrev.回数券売上実績):"—", tr(sMain.回数券売上実績, sPrevPrev?.回数券売上実績)],
+    ["物販",      "¥"+fmt(sMain.物販売上実績),   "BP:¥29,700",                 "—",                                          sPrevPrev?"¥"+fmt(sPrevPrev.物販売上実績):"—",   tr(sMain.物販売上実績, sPrevPrev?.物販売上実績)],
   ];
-  addTable(sl2, kpiRows, 20, 56, 530, 450, "#dbeafe", 9);
-  // 達成率グラフ（右側）
-  const chartLabels = ["売上", "見込み", "総客数", "新規", "再来", "客単価", "回数券"];
+  const tblW = Math.round(CW * 0.52);
+  const chartW = CW - tblW - 5;
+  addTable(sl2, kpiRows, 15, CY, tblW, CH, "#dbeafe", 8);
+  const chartLabels = ["売上", "総客数", "新規", "再来", "客単価", "回数券"];
   const chartVals = [
-    salesPct, mkPct2,
-    pct(s.総客数実績,s.総客数目標), pct(s.新規実績,s.新規目標),
-    pct(s.再来実績,s.再来目標),    pct(s.客単価実績,s.客単価目標),
-    pct(s.回数券売上実績,s.回数券売上目標)
+    salesPct,
+    pct(sMain.総客数実績,sMain.総客数目標), pct(sMain.新規実績,sMain.新規目標),
+    pct(sMain.再来実績,sMain.再来目標),    pct(sMain.客単価実績,sMain.客単価目標),
+    pct(sMain.回数券売上実績,sMain.回数券売上目標)
   ];
-  addChart(sl2, chartLabels, chartVals, "達成率(%)", 565, 56, 390, 450);
+  addChart(sl2, chartLabels, chartVals, "達成率(%)", 15 + tblW + 5, CY, chartW, CH);
 
-  // スライド4: メニュー構成比
+  // スライド3: メニュー構成比
   const sl4m = pres.appendSlide();
   clearSlide(sl4m);
   setBg(sl4m, BG_LIGHT);
-  addBox(sl4m, "2. メニュー構成比", 40, 15, 500, 40, 18, true, ACCENT);
+  addBox(sl4m, "2. メニュー構成比", 15, TY, CW, TH, 15, true, ACCENT);
   if (menuData && menuData.total > 0) {
-    // 円グラフ（左側）
+    const pieW = Math.round(CW * 0.46);
+    const tableW = CW - pieW - 5;
     try {
       const pieDt = Charts.newDataTable()
         .addColumn(Charts.ColumnType.STRING, "メニュー")
@@ -1243,13 +1614,12 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
       if (menuData.counts.other > 0) pieDt.addRow(["その他", menuData.counts.other]);
       const pieChart = Charts.newPieChart()
         .setDataTable(pieDt.build())
-        .setTitle("メニュー構成比（件数）")
-        .setDimensions(460, 420)
+        .setTitle("メニュー構成比")
+        .setDimensions(pieW, CH)
         .setOption("legend.position", "bottom")
         .build();
-      sl4m.insertImage(pieChart.getAs("image/png"), 20, 60, 460, 420);
+      sl4m.insertImage(pieChart.getAs("image/png"), 15, CY, pieW, CH);
     } catch(pe) { Logger.log("pie error: " + pe); }
-    // テーブル（右側）
     const mKeys = ["matsu","mayu","matsuMayu","matsuMayuPerm","other"];
     const mRows = [["メニュー", "件数", "比率", "売上"]];
     mKeys.forEach(k => {
@@ -1260,59 +1630,123 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
       mRows.push([menuData.labels[k], cnt + "件", ratio, amt]);
     });
     mRows.push(["合計", menuData.total + "件", "100%", Math.round(Object.values(menuData.amounts).reduce((a,b)=>a+b,0)/10000) + "万円"]);
-    addTable(sl4m, mRows, 500, 60, 440, 420, "#dbeafe", 10);
+    addTable(sl4m, mRows, 15 + pieW + 5, CY, tableW, CH, "#dbeafe", 9);
   } else {
-    addBox(sl4m, "メニューデータなし（売上明細シートに施術データが必要です）", 40, 80, 880, 60, 13, false, "#64748b");
+    addBox(sl4m, "メニューデータなし（売上明細シートに施術データが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
   }
 
-  // スライド5: 顧客象限
+  // スライド4: スタッフ別売上
+  const slStaff = pres.appendSlide();
+  clearSlide(slStaff);
+  setBg(slStaff, BG_LIGHT);
+  addBox(slStaff, "3. スタッフ別売上", 15, TY, CW, TH, 15, true, ACCENT);
+  const rptStaff = storeReport && storeReport.staff && storeReport.staff.length > 0 ? storeReport.staff : null;
+  if (rptStaff) {
+    const staffRows = [["スタッフ名", "施術数", "売上"]];
+    rptStaff.slice(0, 10).forEach(st => staffRows.push([st.name, st.count + "件", "¥" + Math.round(st.sales).toLocaleString()]));
+    const staffW = Math.round(CW * 0.5);
+    addTable(slStaff, staffRows, 15, CY, staffW, CH, "#e0f2fe", 9);
+    // 売上ランキングバーチャート
+    try {
+      const staffDt = Charts.newDataTable()
+        .addColumn(Charts.ColumnType.STRING, "スタッフ")
+        .addColumn(Charts.ColumnType.NUMBER, "売上");
+      rptStaff.slice(0, 8).forEach(st => staffDt.addRow([st.name, st.sales]));
+      const staffChart = Charts.newBarChart()
+        .setDataTable(staffDt.build())
+        .setTitle("スタッフ別売上")
+        .setColors(["#0891b2"])
+        .setDimensions(CW - staffW - 5, CH)
+        .setOption("legend.position", "none")
+        .build();
+      slStaff.insertImage(staffChart.getAs("image/png"), 15 + staffW + 5, CY, CW - staffW - 5, CH);
+    } catch(e) { Logger.log("staff chart err: " + e); }
+  } else {
+    addBox(slStaff, "スタッフデータなし（売上明細シートに施術データが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
+  }
+
+  // スライド5: 月別推移
+  const slTrend = pres.appendSlide();
+  clearSlide(slTrend);
+  setBg(slTrend, BG_LIGHT);
+  addBox(slTrend, "4. 月別推移（9〜3月）", 15, TY, CW, TH, 15, true, ACCENT);
+  const rptMonthly = storeReport && storeReport.monthly && storeReport.monthly.length > 0 ? storeReport.monthly : null;
+  if (rptMonthly) {
+    const trendW = Math.round(CW * 0.42);
+    const chartTW = CW - trendW - 5;
+    const mRows = [["月", "売上", "施術数", "客単価"]];
+    rptMonthly.forEach(m => mRows.push([
+      m.label,
+      Math.round(m.sales / 10000) + "万円",
+      m.serviceCount + "件",
+      "¥" + Math.round(m.unitPrice).toLocaleString()
+    ]));
+    addTable(slTrend, mRows, 15, CY, trendW, CH, "#fef9c3", 9);
+    try {
+      const trendDt = Charts.newDataTable()
+        .addColumn(Charts.ColumnType.STRING, "月")
+        .addColumn(Charts.ColumnType.NUMBER, "売上(万円)");
+      rptMonthly.forEach(m => trendDt.addRow([m.label, Math.round(m.sales / 10000)]));
+      const trendChart = Charts.newColumnChart()
+        .setDataTable(trendDt.build())
+        .setTitle("月別売上推移")
+        .setColors(["#2563eb"])
+        .setDimensions(chartTW, CH)
+        .setOption("legend.position", "none")
+        .build();
+      slTrend.insertImage(trendChart.getAs("image/png"), 15 + trendW + 5, CY, chartTW, CH);
+    } catch(e) { Logger.log("trend chart err: " + e); }
+  } else {
+    addBox(slTrend, "月別データなし（売上明細シートにデータが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
+  }
+
+  // スライド6: 顧客象限
   const sl4 = pres.appendSlide();
   clearSlide(sl4);
   setBg(sl4, BG_DARK);
-  addBox(sl4, "3. 顧客象限分析", 40, 20, 880, 45, 20, true, "#60a5fa");
-  addBox(sl4, "現在のポジション: 【" + quadrant + "】", 40, 80, 880, 50, 22, true, "#fbbf24");
-  addBox(sl4, quadrantMsg, 40, 145, 880, 50, 14, false, "#e2e8f0");
+  addBox(sl4, "5. 顧客象限分析", 15, TY, CW, TH, 17, true, "#60a5fa");
+  addBox(sl4, "現在のポジション: 【" + quadrant + "】", 15, CY, CW, 42, 20, true, "#fbbf24");
+  addBox(sl4, quadrantMsg, 15, CY+47, CW, 38, 13, false, "#e2e8f0");
   addBox(sl4,
     "新規比率: " + newPct + "% / 再来: " + (100 - newPct) + "%\n" +
     "客単価: ¥" + fmt(unitPrice) + "  （" + (unitPrice >= unitGoal ? "▲ 目標達成" : "▼ 目標未達") + "）\n\n" +
     "集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環",
-    40, 210, 880, 180, 14, false, "#94a3b8");
+    15, CY+92, CW, CH-92, 13, false, "#94a3b8");
 
-  // スライド6: 推奨アクション
-  // 課題分析スライド
+  // スライド5: 課題分析
   const slIssue = pres.appendSlide();
   clearSlide(slIssue);
   setBg(slIssue, BG_LIGHT);
-  addBox(slIssue, "4. 課題分析", 40, 15, 880, 40, 18, true, ACCENT);
+  addBox(slIssue, "6. 課題分析", 15, TY, CW, TH, 15, true, ACCENT);
   const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
   if (issues.length === 0) {
-    addBox(slIssue, "現時点で大きな課題は検出されませんでした。", 40, 80, 880, 60, 13, false, "#64748b");
+    addBox(slIssue, "現時点で大きな課題は検出されませんでした。", 15, CY, CW, 45, 12, false, "#64748b");
   } else {
     const issueRows = [["課題", "現状", "コンサルコメント"]];
     issues.forEach(iss => issueRows.push([iss.title, iss.detail, iss.comment]));
-    addTable(slIssue, issueRows, 20, 62, 920, Math.min(62 + issues.length * 50 + 30, 450), "#fee2e2", 10);
+    addTable(slIssue, issueRows, 15, CY, CW, CH, "#fee2e2", 9);
   }
 
-  // 推奨アクションスライド
+  // スライド6: 推奨アクション
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "5. 推奨アクション（ベストプラクティスより）", 40, 15, 880, 40, 18, true, ACCENT);
-  const strategies = getRelevantStrategies(quadrant, { nextRes: s.次回予約率実績 || 0, unitPrice, newGuest: s.新規実績 || 0 });
+  addBox(sl5, "7. 推奨アクション（ベストプラクティスより）", 15, TY, CW, TH, 14, true, ACCENT);
+  const strategies = getRelevantStrategies(quadrant, { nextRes: sMain.次回予約率実績 || 0, unitPrice, newGuest: sMain.新規実績 || 0 });
   if (strategies.length > 0) {
     const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
     strategies.slice(0, 8).forEach(st => stratRows.push([st.name||"", st.target||"—", st.importance||"—", st.timing||"—"]));
-    addTable(sl5, stratRows, 20, 62, 920, 440, "#fef9c3", 10);
+    addTable(sl5, stratRows, 15, CY, CW, CH, "#fef9c3", 9);
   } else {
-    addBox(sl5, "施策データなし", 40, 80, 880, 60, 13, false, "#64748b");
+    addBox(sl5, "施策データなし", 15, CY, CW, 45, 12, false, "#64748b");
   }
 
-  // スライド: その他
+  // スライド7: その他
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "6. その他", 40, 20, 880, 45, 18, true, "#60a5fa");
-  addBox(sl7, memo || "（なし）", 40, 80, 880, 300, 14, false, "#e2e8f0");
+  addBox(sl7, "8. その他", 15, TY, CW, TH, 16, true, "#60a5fa");
+  addBox(sl7, memo || "（なし）", 15, CY, CW, CH, 13, false, "#e2e8f0");
 
   pres.saveAndClose();
   // 他アカウントからも閲覧できるようリンク共有を設定
@@ -1320,6 +1754,156 @@ function createAgendaSlides(title, s, sPrev, prevYMStr, tasks, quadrant, quadran
     DriveApp.getFileById(pres.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch(shareErr) { Logger.log("slides share error: " + shareErr); }
   return pres.getUrl();
+}
+
+// =============================================
+// 店舗レポート
+// =============================================
+
+/**
+ * 指定店舗の売上明細から月別・メニュー・スタッフの集計を返す
+ */
+function getStoreReport(storeName) {
+  if (!storeName) return { error: "店舗名が必要です" };
+
+  const nameMap = _getSalesNameMap();
+  const officialName = nameMap.abbrToOfficial[storeName] || storeName;
+
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_SALES);
+  if (!ws) return { error: "売上明細シートなし" };
+
+  const rows = ws.getDataRange().getValues();
+  const monthlyMap = {};
+  const menuMap = {};
+  const staffMap = {};
+
+  for (let i = 1; i < rows.length; i++) {
+    const store = String(rows[i][0] || "").trim();
+    if (store !== officialName) continue;
+
+    const dn = parseFloat(rows[i][1]) || 0;
+    const ym = Math.floor(dn / 100);
+    if (!ym || ym < 200001) continue;
+
+    const kubun   = String(rows[i][5]  || "").trim();  // F列：区分
+    const category = String(rows[i][7] || "").trim();  // H列：カテゴリ
+    const amount  = parseFloat(rows[i][12]) || 0;      // M列：金額
+    const staff   = String(rows[i][13] || "").trim();  // N列：スタッフ名
+    const cnt     = parseFloat(rows[i][11]) || 1;      // L列：件数
+
+    if (!monthlyMap[ym]) monthlyMap[ym] = { sales: 0, serviceCount: 0 };
+
+    if (kubun === "施術") {
+      monthlyMap[ym].sales += amount;
+      monthlyMap[ym].serviceCount += cnt;
+
+      if (category) {
+        if (!menuMap[category]) menuMap[category] = { count: 0, sales: 0 };
+        menuMap[category].count += cnt;
+        menuMap[category].sales += amount;
+      }
+      if (staff) {
+        if (!staffMap[staff]) staffMap[staff] = { count: 0, sales: 0 };
+        staffMap[staff].count += cnt;
+        staffMap[staff].sales += amount;
+      }
+    }
+  }
+
+  const months = Object.keys(monthlyMap).map(Number).sort();
+  const monthly = months.map(ym => ({
+    ym,
+    label: (ym % 100) + "月",
+    sales: monthlyMap[ym].sales,
+    serviceCount: monthlyMap[ym].serviceCount,
+    unitPrice: monthlyMap[ym].serviceCount > 0
+      ? Math.round(monthlyMap[ym].sales / monthlyMap[ym].serviceCount) : 0
+  }));
+
+  const menus = Object.entries(menuMap)
+    .sort((a, b) => b[1].sales - a[1].sales)
+    .map(([name, d]) => ({ name, count: d.count, sales: d.sales }));
+
+  const staff = Object.entries(staffMap)
+    .sort((a, b) => b[1].sales - a[1].sales)
+    .slice(0, 15)
+    .map(([name, d]) => ({ name, count: d.count, sales: d.sales }));
+
+  return { storeName, officialName, monthly, menus, staff };
+}
+
+// =============================================
+// 売上情報CSV 自動同期
+// =============================================
+
+const SYNC_SOURCE_SS_ID  = "1B2eQ8K4oN7DgvTU3-mWF8ZShfDDVPXM8aU6GuxlWwMI";
+const SYNC_SOURCE_GID    = 50056376;
+const SYNC_DEST_GID      = 2067713084;  // sv-portal SS内の同期先シート
+
+/**
+ * gidでシートを取得するヘルパー
+ */
+function _getSheetByGid(ss, gid) {
+  return ss.getSheets().find(s => s.getSheetId() === gid) || null;
+}
+
+/**
+ * 売上情報CSVシートの内容をsv-portalシートに全量コピー
+ * GASエディタまたは時間トリガーから実行する
+ */
+function syncSalesData() {
+  const srcSS  = SpreadsheetApp.openById(SYNC_SOURCE_SS_ID);
+  const srcSht = _getSheetByGid(srcSS, SYNC_SOURCE_GID);
+  if (!srcSht) throw new Error("同期元シートが見つかりません (gid=" + SYNC_SOURCE_GID + ")");
+
+  const destSS  = SpreadsheetApp.openById(SS_ID);
+  const destSht = _getSheetByGid(destSS, SYNC_DEST_GID);
+  if (!destSht) throw new Error("同期先シートが見つかりません (gid=" + SYNC_DEST_GID + ")");
+
+  const srcData = srcSht.getDataRange().getValues();
+  if (!srcData || srcData.length === 0) {
+    Logger.log("同期元にデータがありません");
+    return;
+  }
+
+  const numRows = srcData.length;
+  const numCols = srcData[0].length;
+
+  // シートのサイズをデータに合わせて縮小（セル上限対策）
+  const curRows = destSht.getMaxRows();
+  const curCols = destSht.getMaxColumns();
+  if (curRows > numRows) destSht.deleteRows(numRows + 1, curRows - numRows);
+  if (curCols > numCols) destSht.deleteColumns(numCols + 1, curCols - numCols);
+
+  // 行・列が足りなければ追加
+  if (destSht.getMaxRows() < numRows) destSht.insertRowsAfter(destSht.getMaxRows(), numRows - destSht.getMaxRows());
+  if (destSht.getMaxColumns() < numCols) destSht.insertColumnsAfter(destSht.getMaxColumns(), numCols - destSht.getMaxColumns());
+
+  // クリアして書き込み
+  destSht.clearContents();
+  destSht.getRange(1, 1, numRows, numCols).setValues(srcData);
+
+  Logger.log("同期完了: " + numRows + "行 × " + numCols + "列");
+}
+
+/**
+ * 毎日自動実行するトリガーを登録（GASエディタで1回だけ実行する）
+ * 既存トリガーが重複しないようチェックしてから登録
+ */
+function setupSyncTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  const alreadySet = triggers.some(t => t.getHandlerFunction() === "syncSalesData");
+  if (alreadySet) {
+    Logger.log("トリガーは既に登録済みです");
+    return;
+  }
+  ScriptApp.newTrigger("syncSalesData")
+    .timeBased()
+    .everyDays(1)
+    .atHour(6)  // 毎朝6時に実行
+    .create();
+  Logger.log("毎日6時に syncSalesData を実行するトリガーを登録しました");
 }
 
 // ─ 権限認証用（GASエディタで1回だけ実行する） ─
