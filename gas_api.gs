@@ -44,6 +44,10 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action === "repairAbbrColumn") {
       return json({ result: repairAbbrColumn() });
     }
+    // 略称列の差分同期: ?action=syncAbbrColumn
+    if (e && e.parameter && e.parameter.action === "syncAbbrColumn") {
+      return json({ result: syncAbbrColumn() });
+    }
     // 売上データ同期実行: ?action=syncSalesData
     if (e && e.parameter && e.parameter.action === "syncSalesData") {
       syncSalesData();
@@ -1848,6 +1852,96 @@ function repairAbbrColumn() {
   const sample = abbrs.slice(0, 5).map(r => r[0]);
   Logger.log("略称列修復完了: " + abbrs.length + "行, サンプル: " + sample.join(", "));
   return { status: "done", rows: abbrs.length, sample };
+}
+
+// =============================================
+// 略称列 自動同期（差分のみ更新）
+// =============================================
+
+/**
+ * 売上明細の略称列(A)を差分チェックして未設定・不正行だけ更新する。
+ * 毎時トリガーで自動実行 → 新店舗が追加されても自動で略称が入る。
+ * ?action=syncAbbrColumn から手動実行も可。
+ */
+function syncAbbrColumn() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_SALES);
+  if (!ws) return { status: "no_sheet" };
+
+  const headerA = String(ws.getRange(1, 1).getValue()).trim();
+  if (headerA !== "略称") {
+    // 略称列がまだ未挿入なら挿入から実行
+    addAbbrColumnToSales();
+    repairAbbrColumn();
+    return { status: "inserted_and_repaired" };
+  }
+
+  _salesRowsCache = null;
+  _salesNameCache = null;
+  const nameMap = _getSalesNameMap();
+
+  const lastRow = ws.getLastRow();
+  if (lastRow < 2) return { status: "no_data" };
+
+  // A列（略称）とB列（正式名称）を一括取得
+  const abbrVals    = ws.getRange(2, 1, lastRow - 1, 1).getValues();
+  const officialVals = ws.getRange(2, 2, lastRow - 1, 1).getValues();
+
+  // 差分行を収集（略称が空 or 正式名称と同じ = マッピング失敗行）
+  const updates = []; // { row1based, abbr }
+  for (let i = 0; i < officialVals.length; i++) {
+    const official = String(officialVals[i][0] || "").trim();
+    if (!official) continue;
+    const expected = nameMap.officialToAbbr[official] || null;
+    if (!expected) continue;           // マッピングなし（新店舗候補）はスキップ
+    const current  = String(abbrVals[i][0] || "").trim();
+    if (current === expected) continue; // 正しいのでスキップ
+    updates.push({ idx: i, abbr: expected });
+  }
+
+  if (updates.length === 0) {
+    _salesRowsCache = null;
+    _salesNameCache = null;
+    return { status: "already_ok", rows: 0 };
+  }
+
+  // 連続行をまとめてセット（API呼び出し回数を最小化）
+  let batchStart = updates[0].idx;
+  let batchVals  = [[updates[0].abbr]];
+  for (let k = 1; k <= updates.length; k++) {
+    const cur  = updates[k];
+    const prev = updates[k - 1];
+    if (cur && cur.idx === prev.idx + 1) {
+      batchVals.push([cur.abbr]);
+    } else {
+      ws.getRange(batchStart + 2, 1, batchVals.length, 1).setValues(batchVals);
+      if (cur) { batchStart = cur.idx; batchVals = [[cur.abbr]]; }
+    }
+  }
+
+  _salesRowsCache = null;
+  _salesNameCache = null;
+  Logger.log("syncAbbrColumn: " + updates.length + " 行を更新");
+  return { status: "done", updated: updates.length };
+}
+
+/**
+ * 毎時トリガーを設定する（一度だけGASエディタから実行）。
+ * 既に設定済みの場合は重複しない。
+ */
+function setupAbbrSyncTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  const exists = triggers.some(t => t.getHandlerFunction() === "syncAbbrColumn");
+  if (exists) {
+    Logger.log("トリガーは既に設定済みです");
+    return "already_exists";
+  }
+  ScriptApp.newTrigger("syncAbbrColumn")
+    .timeBased()
+    .everyHours(1)
+    .create();
+  Logger.log("毎時トリガーを設定しました");
+  return "created";
 }
 
 // =============================================
