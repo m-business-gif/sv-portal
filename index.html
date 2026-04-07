@@ -438,7 +438,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbxm6-d1H4YYuh7h28Q62TKS7wYm9uTJITioFPyQXuXT_X_NiFIzaBfNf6VEDU6zJ69v/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbwvwurPvoytVijzMquqw7ThldsWfyL982wbtqxw0pwwvz78E06peppE50KUzxhpcCSO/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
@@ -1995,127 +1995,140 @@ async function loadStoreReport(){
 }
 
 function renderStoreReport(d,body){
-  const CHART_COLORS=["#2563eb","#7c3aed","#0891b2","#059669","#c2410c","#d97706","#db2777","#65a30d","#0284c7","#9333ea"];
+  const CC=["#2563eb","#7c3aed","#0891b2","#059669","#c2410c","#d97706","#db2777","#65a30d","#0284c7","#9333ea","#b45309","#0f766e"];
   const monthly=d.monthly||[];
   const menus=d.menus||[];
   const staff=d.staff||[];
-  const labels=monthly.map(m=>m.label);
+  const monthlyMenus=d.monthlyMenus||[];
+  const allMenuNames=d.allMenuNames||[];
+  const mLabels=monthly.map(m=>m.label);
   const totalSales=monthly.reduce((s,m)=>s+m.sales,0);
   const totalCount=monthly.reduce((s,m)=>s+m.serviceCount,0);
   const avgUnit=totalCount>0?Math.round(totalSales/totalCount):0;
+  const topMenuNames=allMenuNames.slice(0,8);
+
+  // 月別メニュー件数の合計（比率計算用）
+  const mmTotals=monthlyMenus.map(m=>topMenuNames.reduce((s,_,i)=>s+m.counts[i],0));
+
+  const card=(label,val)=>`<div style="background:var(--sur);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)">
+    <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">${label}</div>
+    <div style="font-size:20px;font-weight:700;font-family:'Outfit',sans-serif">${val}</div>
+  </div>`;
 
   body.innerHTML=`
-    <div style="margin-bottom:6px">
+    <div style="margin-bottom:10px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
       <span style="font-size:18px;font-weight:700;font-family:'Outfit',sans-serif">${d.storeName}</span>
-      <span style="font-size:11px;color:var(--ink3);margin-left:8px">（売上明細：${monthly.length}ヶ月分）</span>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-      <div style="background:var(--sur);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)">
-        <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">累計売上</div>
-        <div style="font-size:20px;font-weight:700;font-family:'Outfit',sans-serif">${fm(totalSales)}</div>
-      </div>
-      <div style="background:var(--sur);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)">
-        <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">累計施術数</div>
-        <div style="font-size:20px;font-weight:700;font-family:'Outfit',sans-serif">${totalCount.toLocaleString()}件</div>
-      </div>
-      <div style="background:var(--sur);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)">
-        <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">平均客単価</div>
-        <div style="font-size:20px;font-weight:700;font-family:'Outfit',sans-serif">${avgUnit.toLocaleString()}円</div>
-      </div>
+      <span style="font-size:11px;color:var(--ink3)">売上明細 ${monthly.length}ヶ月分</span>
     </div>
 
+    <!-- サマリーカード -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+      ${card("累計売上（施術）",fm(totalSales))}
+      ${card("累計施術件数",totalCount.toLocaleString()+"件")}
+      ${card("平均客単価",avgUnit.toLocaleString()+"円")}
+    </div>
+
+    <!-- 月別売上 + 客単価推移 -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
       <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
         <div style="font-size:12px;font-weight:700;margin-bottom:12px">月別売上推移</div>
         <canvas id="rpt-c-sales" height="180"></canvas>
       </div>
       <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">月別客単価・施術数</div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:12px">月別施術数・客単価</div>
         <canvas id="rpt-c-unit" height="180"></canvas>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">メニュー構成比（売上）</div>
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <canvas id="rpt-c-menu" width="140" height="140" style="flex-shrink:0"></canvas>
-          <div id="rpt-menu-legend" style="font-size:11px;line-height:2"></div>
+    <!-- 月別メニュー推移（件数積み上げ） -->
+    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">月別メニュー推移（件数）</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">どのメニューが増減しているか</div>
+      <canvas id="rpt-c-mmtrend" height="140"></canvas>
+    </div>
+
+    <!-- メニュー比率（ドーナツ+表） -->
+    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:12px">メニュー構成比</div>
+      <div style="display:grid;grid-template-columns:160px 1fr;gap:20px;align-items:flex-start">
+        <div>
+          <div style="font-size:10px;color:var(--ink3);margin-bottom:6px;text-align:center">件数比率</div>
+          <canvas id="rpt-c-menu-cnt" width="150" height="150"></canvas>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
+            <thead><tr style="border-bottom:1px solid var(--bdr)">
+              <th style="text-align:left;padding:5px 4px;color:var(--ink3)">メニュー</th>
+              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">件数</th>
+              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">件数%</th>
+              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">売上</th>
+              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">平均単価</th>
+            </tr></thead>
+            <tbody>${(()=>{
+              const tot=menus.reduce((s,m)=>s+m.count,0);
+              return menus.map((m,i)=>`<tr style="border-bottom:1px solid var(--bdr2)">
+                <td style="padding:5px 4px;display:flex;align-items:center;gap:5px">
+                  <span style="width:8px;height:8px;border-radius:2px;background:${CC[i%CC.length]};flex-shrink:0;display:inline-block"></span>${m.name}
+                </td>
+                <td style="text-align:right;color:var(--ink2)">${m.count}</td>
+                <td style="text-align:right;font-weight:600">${tot>0?Math.round(m.count/tot*100):0}%</td>
+                <td style="text-align:right">${fm(m.sales)}</td>
+                <td style="text-align:right;color:var(--ink2)">${m.avgPrice.toLocaleString()}円</td>
+              </tr>`).join("");
+            })()}</tbody>
+          </table>
         </div>
       </div>
-      <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">スタッフ別売上</div>
-        <canvas id="rpt-c-staff" height="180"></canvas>
-      </div>
     </div>
 
+    <!-- 月別メニュー比率推移（%積み上げ）-->
+    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">月別メニュー比率推移（%）</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">メニュー構成がどう変化しているか</div>
+      <canvas id="rpt-c-mmpct" height="140"></canvas>
+    </div>
+
+    <!-- スタッフ別売上 + 区分サマリー -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:10px">メニュー詳細</div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead><tr style="border-bottom:1px solid var(--bdr)">
-            <th style="text-align:left;padding:4px 0;color:var(--ink3)">メニュー</th>
-            <th style="text-align:right;padding:4px 0;color:var(--ink3)">件数</th>
-            <th style="text-align:right;padding:4px 0;color:var(--ink3)">売上</th>
-          </tr></thead>
-          <tbody>${menus.map(m=>`<tr style="border-bottom:1px solid var(--bdr2)">
-            <td style="padding:5px 0">${m.name}</td>
-            <td style="text-align:right;color:var(--ink2)">${m.count}</td>
-            <td style="text-align:right;font-weight:600">${fm(m.sales)}</td>
-          </tr>`).join("")}</tbody>
-        </table>
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">スタッフ別売上（上位10名）</div>
+        <canvas id="rpt-c-staff" height="200"></canvas>
       </div>
       <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:10px">スタッフ詳細</div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">区分別サマリー</div>
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead><tr style="border-bottom:1px solid var(--bdr)">
-            <th style="text-align:left;padding:4px 0;color:var(--ink3)">スタッフ</th>
+            <th style="text-align:left;padding:4px 0;color:var(--ink3)">区分</th>
             <th style="text-align:right;padding:4px 0;color:var(--ink3)">件数</th>
-            <th style="text-align:right;padding:4px 0;color:var(--ink3)">売上</th>
+            <th style="text-align:right;padding:4px 0;color:var(--ink3)">金額</th>
           </tr></thead>
-          <tbody>${staff.map(s=>`<tr style="border-bottom:1px solid var(--bdr2)">
-            <td style="padding:5px 0">${s.name}</td>
-            <td style="text-align:right;color:var(--ink2)">${s.count}</td>
-            <td style="text-align:right;font-weight:600">${fm(s.sales)}</td>
-          </tr>`).join("")}</tbody>
+          <tbody>${(d.kubunSummary||[]).map(k=>{
+            const isCoupon=k.kubun.includes("クーポン")||k.kubun.includes("割引")||k.sales<0;
+            return`<tr style="border-bottom:1px solid var(--bdr2)${isCoupon?";background:var(--amb2)":""}">
+              <td style="padding:5px 0;font-weight:${isCoupon?700:400}">${k.kubun}${isCoupon?" 🏷":""}${k.kubun==="施術"?" ✓":""}</td>
+              <td style="text-align:right;color:var(--ink2)">${k.count}</td>
+              <td style="text-align:right;font-weight:600;color:${k.sales<0?"var(--red)":"inherit"}">${k.sales<0?"-":""}${fm(Math.abs(k.sales))}</td>
+            </tr>`;
+          }).join("")}</tbody>
         </table>
       </div>
-    </div>
+    </div>`;
 
-    ${(d.kubunSummary||[]).length>0?`
-    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-top:16px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:10px">区分別サマリー（クーポン・割引・物販など）</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="border-bottom:1px solid var(--bdr)">
-          <th style="text-align:left;padding:4px 0;color:var(--ink3)">区分</th>
-          <th style="text-align:right;padding:4px 0;color:var(--ink3)">件数</th>
-          <th style="text-align:right;padding:4px 0;color:var(--ink3)">金額</th>
-        </tr></thead>
-        <tbody>${(d.kubunSummary||[]).map(k=>{
-          const isCoupon=k.kubun.includes("クーポン")||k.kubun.includes("割引")||k.sales<0;
-          return`<tr style="border-bottom:1px solid var(--bdr2)${isCoupon?";background:var(--amb2)":""}">
-            <td style="padding:5px 0;font-weight:${isCoupon?700:400}">${k.kubun}${isCoupon?" 🏷":""}${k.kubun==="施術"?" ✓":""}</td>
-            <td style="text-align:right;color:var(--ink2)">${k.count}</td>
-            <td style="text-align:right;font-weight:600;color:${k.sales<0?"var(--red)":"inherit"}">${k.sales<0?"-":""}${fm(Math.abs(k.sales))}</td>
-          </tr>`;
-        }).join("")}</tbody>
-      </table>
-    </div>`:""}
-    `;
+  // ── チャート描画 ──
 
-  // 月別売上グラフ
+  // 月別売上
   _destroyChart("sales");
   _rptCharts["sales"]=new Chart(document.getElementById("rpt-c-sales"),{
     type:"bar",
-    data:{labels,datasets:[{label:"売上",data:monthly.map(m=>m.sales),backgroundColor:"rgba(37,99,235,.7)",borderRadius:4}]},
+    data:{labels:mLabels,datasets:[{label:"売上",data:monthly.map(m=>m.sales),backgroundColor:"rgba(37,99,235,.7)",borderRadius:4}]},
     options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fm(v)},grid:{color:"rgba(0,0,0,.05)"}}}}
   });
 
-  // 客単価・施術数
+  // 月別施術数 + 客単価
   _destroyChart("unit");
   _rptCharts["unit"]=new Chart(document.getElementById("rpt-c-unit"),{
     type:"bar",
-    data:{labels,datasets:[
+    data:{labels:mLabels,datasets:[
       {label:"施術数",data:monthly.map(m=>m.serviceCount),backgroundColor:"rgba(124,58,237,.5)",borderRadius:4,yAxisID:"y1"},
       {label:"客単価",data:monthly.map(m=>m.unitPrice),type:"line",borderColor:"#c2410c",backgroundColor:"rgba(194,65,12,.1)",pointRadius:4,yAxisID:"y2",tension:.3}
     ]},
@@ -2125,27 +2138,55 @@ function renderStoreReport(d,body){
     }}
   });
 
-  // メニュー構成比（上位8件 + その他）
-  _destroyChart("menu");
-  const topMenus=menus.slice(0,8);
-  const otherSales=menus.slice(8).reduce((s,m)=>s+m.sales,0);
-  const menuLabels=[...topMenus.map(m=>m.name),...(otherSales>0?["その他"]:[])];
-  const menuData=[...topMenus.map(m=>m.sales),...(otherSales>0?[otherSales]:[])];
-  _rptCharts["menu"]=new Chart(document.getElementById("rpt-c-menu"),{
+  // 月別メニュー推移（件数積み上げ棒）
+  _destroyChart("mmtrend");
+  _rptCharts["mmtrend"]=new Chart(document.getElementById("rpt-c-mmtrend"),{
+    type:"bar",
+    data:{
+      labels:monthlyMenus.map(m=>m.label),
+      datasets:topMenuNames.map((name,i)=>({
+        label:name,
+        data:monthlyMenus.map(m=>m.counts[i]),
+        backgroundColor:CC[i%CC.length]+"cc",
+        borderRadius:2,
+        stack:"s"
+      }))
+    },
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}},
+      scales:{x:{stacked:true},y:{stacked:true,ticks:{stepSize:5},grid:{color:"rgba(0,0,0,.04)"}}}}
+  });
+
+  // メニュー件数ドーナツ
+  _destroyChart("menuCnt");
+  const topM=menus.slice(0,8);
+  const otherCnt=menus.slice(8).reduce((s,m)=>s+m.count,0);
+  const cntLabels=[...topM.map(m=>m.name),...(otherCnt>0?["その他"]:[])];
+  const cntData=[...topM.map(m=>m.count),...(otherCnt>0?[otherCnt]:[])];
+  _rptCharts["menuCnt"]=new Chart(document.getElementById("rpt-c-menu-cnt"),{
     type:"doughnut",
-    data:{labels:menuLabels,datasets:[{data:menuData,backgroundColor:CHART_COLORS,borderWidth:1}]},
+    data:{labels:cntLabels,datasets:[{data:cntData,backgroundColor:CC.slice(0,cntLabels.length),borderWidth:1}]},
     options:{responsive:false,plugins:{legend:{display:false}}}
   });
-  const menuTotalSales=menuData.reduce((s,v)=>s+v,0);
-  document.getElementById("rpt-menu-legend").innerHTML=menuLabels.map((l,i)=>
-    `<div style="display:flex;align-items:center;gap:5px">
-      <span style="width:8px;height:8px;border-radius:2px;background:${CHART_COLORS[i%CHART_COLORS.length]};flex-shrink:0"></span>
-      <span style="color:var(--ink2)">${l}</span>
-      <span style="color:var(--ink3);margin-left:auto">${menuTotalSales>0?Math.round(menuData[i]/menuTotalSales*100):0}%</span>
-    </div>`
-  ).join("");
 
-  // スタッフ別売上（上位10件）
+  // 月別メニュー比率（%積み上げ）
+  _destroyChart("mmpct");
+  _rptCharts["mmpct"]=new Chart(document.getElementById("rpt-c-mmpct"),{
+    type:"bar",
+    data:{
+      labels:monthlyMenus.map(m=>m.label),
+      datasets:topMenuNames.map((name,i)=>({
+        label:name,
+        data:monthlyMenus.map((m,mi)=>mmTotals[mi]>0?Math.round(m.counts[i]/mmTotals[mi]*100):0),
+        backgroundColor:CC[i%CC.length]+"cc",
+        borderRadius:2,
+        stack:"s"
+      }))
+    },
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}},
+      scales:{x:{stacked:true},y:{stacked:true,max:100,ticks:{callback:v=>v+"%"},grid:{color:"rgba(0,0,0,.04)"}}}}
+  });
+
+  // スタッフ別売上
   _destroyChart("staff");
   const topStaff=staff.slice(0,10);
   _rptCharts["staff"]=new Chart(document.getElementById("rpt-c-staff"),{

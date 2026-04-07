@@ -1755,10 +1755,11 @@ function getStoreReport(storeName, staffYM) {
   const rows = _getSalesRows();
   if (!rows.length) return { error: "売上明細シートなし" };
 
-  const monthlyMap = {};
-  const menuMap = {};
+  const monthlyMap = {};      // ym → { sales, serviceCount }
+  const menuMap = {};          // menuName → { count, sales }
+  const monthlyMenuMap = {};   // ym → { menuName: count }  ← 月別メニュー推移用
   const staffMap = {};
-  const kubunMap = {};   // 区分ごとの集計（クーポン・割引含む）
+  const kubunMap = {};
 
   for (let i = 1; i < rows.length; i++) {
     const store = String(rows[i][SC_NAME] || "").trim();
@@ -1774,12 +1775,10 @@ function getStoreReport(storeName, staffYM) {
     const staff    = String(rows[i][SC_STAFF] || "").trim();
     const cnt      = parseFloat(rows[i][SC_COUNT]) || 1;
 
-    // 区分ごとに集計（全種類）
-    const rawKubun = kubun || String(rows[i][SC_KUBUN] || "").trim();
-    if (rawKubun) {
-      if (!kubunMap[rawKubun]) kubunMap[rawKubun] = { count: 0, sales: 0 };
-      kubunMap[rawKubun].count += cnt;
-      kubunMap[rawKubun].sales += amount;
+    if (kubun) {
+      if (!kubunMap[kubun]) kubunMap[kubun] = { count: 0, sales: 0 };
+      kubunMap[kubun].count += cnt;
+      kubunMap[kubun].sales += amount;
     }
 
     if (!monthlyMap[ym]) monthlyMap[ym] = { sales: 0, serviceCount: 0 };
@@ -1792,8 +1791,12 @@ function getStoreReport(storeName, staffYM) {
         if (!menuMap[category]) menuMap[category] = { count: 0, sales: 0 };
         menuMap[category].count += cnt;
         menuMap[category].sales += amount;
+
+        // 月別メニュー件数
+        if (!monthlyMenuMap[ym]) monthlyMenuMap[ym] = {};
+        monthlyMenuMap[ym][category] = (monthlyMenuMap[ym][category] || 0) + cnt;
       }
-      // スタッフは staffYM 指定時はその月のみ、省略時は全月
+
       if (staff && (!staffYM || ym === staffYM)) {
         if (!staffMap[staff]) staffMap[staff] = { count: 0, sales: 0 };
         staffMap[staff].count += cnt;
@@ -1813,20 +1816,32 @@ function getStoreReport(storeName, staffYM) {
   }));
 
   const menus = Object.entries(menuMap)
-    .sort((a, b) => b[1].sales - a[1].sales)
-    .map(([name, d]) => ({ name, count: d.count, sales: d.sales }));
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([name, d]) => ({
+      name,
+      count: d.count,
+      sales: d.sales,
+      avgPrice: d.count > 0 ? Math.round(d.sales / d.count) : 0
+    }));
+
+  // 月別メニュー推移（件数ベース）
+  const allMenuNames = menus.map(m => m.name); // 件数多い順
+  const monthlyMenus = months.map(ym => ({
+    ym,
+    label: (ym % 100) + "月",
+    counts: allMenuNames.map(name => monthlyMenuMap[ym] ? (monthlyMenuMap[ym][name] || 0) : 0)
+  }));
 
   const staff = Object.entries(staffMap)
     .sort((a, b) => b[1].sales - a[1].sales)
     .slice(0, 15)
     .map(([name, d]) => ({ name, count: d.count, sales: d.sales }));
 
-  // クーポン・割引など施術以外の区分をまとめる
   const kubunSummary = Object.entries(kubunMap)
     .sort((a, b) => b[1].count - a[1].count)
     .map(([kubun, d]) => ({ kubun, count: d.count, sales: d.sales }));
 
-  return { storeName, officialName, monthly, menus, staff, kubunSummary };
+  return { storeName, officialName, monthly, menus, monthlyMenus, allMenuNames, staff, kubunSummary };
 }
 
 // =============================================
