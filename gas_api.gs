@@ -48,6 +48,24 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action === "syncAbbrColumn") {
       return json({ result: syncAbbrColumn() });
     }
+    // 名称マッピングデバッグ: ?action=debugNameMap[&abbr=m町田]
+    if (e && e.parameter && e.parameter.action === "debugNameMap") {
+      _salesRowsCache = null; _salesNameCache = null;
+      const nm = _getSalesNameMap();
+      const target = e.parameter.abbr || "";
+      if (target) {
+        return json({
+          abbrToOfficial: nm.abbrToOfficial[target] || null,
+          officialKeys: Object.keys(nm.officialToAbbr).filter(k => k.includes(target.slice(1) || target)).slice(0, 10)
+        });
+      }
+      return json({
+        abbrCount: Object.keys(nm.abbrToOfficial).length,
+        officialCount: Object.keys(nm.officialToAbbr).length,
+        abbrSample: Object.entries(nm.abbrToOfficial).slice(0, 10),
+        officialSample: Object.entries(nm.officialToAbbr).slice(0, 10)
+      });
+    }
     // 売上データ同期実行: ?action=syncSalesData
     if (e && e.parameter && e.parameter.action === "syncSalesData") {
       syncSalesData();
@@ -1167,48 +1185,92 @@ function _getSalesRows() {
 // SVポータル各シート: 略称  /  売上明細: 正式名称
 // 実行ごとにキャッシュを保持
 let _salesNameCache = null;
+
+/**
+ * 正式名称（売上明細B列）から略称を直接計算する。
+ * 例: 「【まつ毛パーマ/眉毛専門店】most eyes 町田」→「m町田」
+ *     「まつ毛パーマ＆眉毛サロン SSIN STUDIO【シーンスタジオ】渋谷店」→「S渋谷」
+ */
+function _computeAbbrFromOfficial(official) {
+  // 【...】を全て除去してから処理
+  const s = official.replace(/【[^】]*】/g, '').replace(/\s+/g, ' ').trim();
+  const n = s.replace(/\s/g, '').toLowerCase();
+
+  // most eyes
+  const mIdx = n.indexOf('mosteyes');
+  if (mIdx >= 0) {
+    const loc = n.slice(mIdx + 8).replace(/店$/, '');
+    return 'm' + loc;
+  }
+  // SSIN STUDIO（表記ゆれ含む）
+  const sIdx = n.indexOf('ssinstudio');
+  if (sIdx >= 0) {
+    const loc = n.slice(sIdx + 10).replace(/店$/, '');
+    return 'S' + loc;
+  }
+  // LUMISS
+  const lIdx = n.indexOf('lumiss');
+  if (lIdx >= 0) {
+    const loc = n.slice(lIdx + 6).replace(/店$/, '');
+    return 'L' + loc;
+  }
+  // フェリーチェ
+  const fIdx = n.indexOf('フェリーチェ');
+  if (fIdx >= 0) {
+    const loc = n.slice(fIdx + 6).replace(/店$/, '');
+    return 'f' + loc;
+  }
+  // Rire（LUMISS系）
+  const rIdx = n.indexOf('rire');
+  if (rIdx >= 0) {
+    const loc = n.slice(rIdx + 4).replace(/店$/, '');
+    return 'L' + loc;
+  }
+  // 略称形式のまま（m〇〇、S〇〇 等）はそのまま返す
+  return official;
+}
+
 function _getSalesNameMap() {
   if (_salesNameCache) return _salesNameCache;
   const ss = SpreadsheetApp.openById(SS_ID);
-  const wsGoal  = ss.getSheetByName(SHEET_GOAL);
-  const wsSales = ss.getSheetByName(SHEET_SALES);
+  const wsGoal = ss.getSheetByName(SHEET_GOAL);
   const abbrToOfficial = {};
   const officialToAbbr = {};
-  if (!wsGoal) {
-    _salesNameCache = { abbrToOfficial, officialToAbbr };
-    return _salesNameCache;
-  }
-  // 略称一覧（加盟店目標 C列）
-  const abbrNames = [];
-  wsGoal.getDataRange().getValues().slice(1).forEach(r => {
-    const nm = String(r[2] || "").trim();
-    if (nm && !abbrNames.includes(nm)) abbrNames.push(nm);
-  });
-  // 正式名称一覧（売上明細 B列 = SC_NAME）- キャッシュ経由
+  // 正式名称一覧（売上明細 B列）
   const officialNames = new Set();
   _getSalesRows().slice(1).forEach(r => {
     const nm = String(r[SC_NAME] || "").trim();
     if (nm) officialNames.add(nm);
   });
-  // 略称 → 正式名称マッピング（ファジーマッチ）
-  for (const abbr of abbrNames) {
-    if (officialNames.has(abbr)) {
-      abbrToOfficial[abbr] = abbr;
-      officialToAbbr[abbr] = abbr;
-      continue;
+  // 正式名称 → 略称は直接計算
+  for (const official of officialNames) {
+    const abbr = _computeAbbrFromOfficial(official);
+    if (abbr !== official) {
+      officialToAbbr[official] = abbr;
+      // 略称 → 正式名称（同一略称が複数あれば後勝ち）
+      abbrToOfficial[abbr] = official;
     }
-    const normAbbr = _normalizeForMatch(abbr);
-    let best = null;
-    for (const official of officialNames) {
-      const normOfficial = _normalizeForMatch(official);
-      if (normOfficial === normAbbr || normOfficial.includes(normAbbr) || normAbbr.includes(normOfficial)) {
-        if (!best || official.length > best.length) best = official;
+  }
+  // 加盟店目標C列の店舗名（= ポータルで使う名前）でも逆引きできるように補完
+  if (wsGoal) {
+    wsGoal.getDataRange().getValues().slice(1).forEach(r => {
+      const nm = String(r[2] || "").trim();
+      if (!nm) return;
+      if (officialNames.has(nm)) {
+        // 正式名称と同一 → そのままマッピング
+        abbrToOfficial[nm] = nm;
+        officialToAbbr[nm] = nm;
+      } else if (!abbrToOfficial[nm]) {
+        // 計算略称が一致する正式名称を探す
+        const computed = _computeAbbrFromOfficial(nm);
+        for (const official of officialNames) {
+          if (officialToAbbr[official] === computed || official === nm) {
+            abbrToOfficial[nm] = official;
+            break;
+          }
+        }
       }
-    }
-    if (best) {
-      abbrToOfficial[abbr] = best;
-      officialToAbbr[best] = abbr;
-    }
+    });
   }
   _salesNameCache = { abbrToOfficial, officialToAbbr };
   return _salesNameCache;
@@ -1836,12 +1898,11 @@ function repairAbbrColumn() {
   const lastRow = ws.getLastRow();
   if (lastRow < 2) return "no_data";
 
-  // B列（SC_NAME=1→列2）から正式名称を読み、A列に略称を書き込む
+  // B列（SC_NAME=1→列2）から正式名称を読み、略称を直接計算してA列に書き込む
   const officials = ws.getRange(2, 2, lastRow - 1, 1).getValues();
   const abbrs = officials.map(([nm]) => {
     const official = String(nm || "").trim();
-    const abbr = nameMap.officialToAbbr[official];
-    return [abbr || official];
+    return [official ? _computeAbbrFromOfficial(official) : official];
   });
   ws.getRange(2, 1, abbrs.length, 1).setValues(abbrs);
 
