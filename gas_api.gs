@@ -40,6 +40,10 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action === "addAbbrColumn") {
       return json({ result: addAbbrColumnToSales() });
     }
+    // 略称列の値を修復: ?action=repairAbbrColumn
+    if (e && e.parameter && e.parameter.action === "repairAbbrColumn") {
+      return json({ result: repairAbbrColumn() });
+    }
     // 売上データ同期実行: ?action=syncSalesData
     if (e && e.parameter && e.parameter.action === "syncSalesData") {
       syncSalesData();
@@ -1806,6 +1810,44 @@ function addAbbrColumnToSales() {
 
   Logger.log("略称列の挿入完了: " + (lastRow - 1) + "行");
   return "done";
+}
+
+/**
+ * 略称列(A)の値を正しい略称で上書き修復する。
+ * addAbbrColumnToSales() 実行後に略称が正式名称のままになった場合に使用。
+ * ?action=repairAbbrColumn から実行。
+ */
+function repairAbbrColumn() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_SALES);
+  if (!ws) throw new Error("売上明細シートなし");
+  const headerA = String(ws.getRange(1, 1).getValue()).trim();
+  if (headerA !== "略称") return "no_abbr_column";
+
+  // キャッシュをリセットして現在の構造（A=略称、B=正式名称）で名称マップを構築
+  _salesRowsCache = null;
+  _salesNameCache = null;
+  const nameMap = _getSalesNameMap();
+
+  const lastRow = ws.getLastRow();
+  if (lastRow < 2) return "no_data";
+
+  // B列（SC_NAME=1→列2）から正式名称を読み、A列に略称を書き込む
+  const officials = ws.getRange(2, 2, lastRow - 1, 1).getValues();
+  const abbrs = officials.map(([nm]) => {
+    const official = String(nm || "").trim();
+    const abbr = nameMap.officialToAbbr[official];
+    return [abbr || official];
+  });
+  ws.getRange(2, 1, abbrs.length, 1).setValues(abbrs);
+
+  _salesRowsCache = null;
+  _salesNameCache = null;
+
+  // 変換結果サンプル（確認用）
+  const sample = abbrs.slice(0, 5).map(r => r[0]);
+  Logger.log("略称列修復完了: " + abbrs.length + "行, サンプル: " + sample.join(", "));
+  return { status: "done", rows: abbrs.length, sample };
 }
 
 // =============================================
