@@ -1662,46 +1662,11 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
     addBox(slStaff, "スタッフデータなし（売上明細シートに施術データが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
   }
 
-  // スライド5: 月別推移
-  const slTrend = pres.appendSlide();
-  clearSlide(slTrend);
-  setBg(slTrend, BG_LIGHT);
-  addBox(slTrend, "4. 月別推移（9〜3月）", 15, TY, CW, TH, 15, true, ACCENT);
-  const rptMonthly = storeReport && storeReport.monthly && storeReport.monthly.length > 0 ? storeReport.monthly : null;
-  if (rptMonthly) {
-    const trendW = Math.round(CW * 0.42);
-    const chartTW = CW - trendW - 5;
-    const mRows = [["月", "売上", "施術数", "客単価"]];
-    rptMonthly.forEach(m => mRows.push([
-      m.label,
-      Math.round(m.sales / 10000) + "万円",
-      m.serviceCount + "件",
-      "¥" + Math.round(m.unitPrice).toLocaleString()
-    ]));
-    addTable(slTrend, mRows, 15, CY, trendW, CH, "#fef9c3", 9);
-    try {
-      const trendDt = Charts.newDataTable()
-        .addColumn(Charts.ColumnType.STRING, "月")
-        .addColumn(Charts.ColumnType.NUMBER, "売上(万円)");
-      rptMonthly.forEach(m => trendDt.addRow([m.label, Math.round(m.sales / 10000)]));
-      const trendChart = Charts.newColumnChart()
-        .setDataTable(trendDt.build())
-        .setTitle("月別売上推移")
-        .setColors(["#2563eb"])
-        .setDimensions(chartTW, CH)
-        .setOption("legend.position", "none")
-        .build();
-      slTrend.insertImage(trendChart.getAs("image/png"), 15 + trendW + 5, CY, chartTW, CH);
-    } catch(e) { Logger.log("trend chart err: " + e); }
-  } else {
-    addBox(slTrend, "月別データなし（売上明細シートにデータが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
-  }
-
   // スライド6: 顧客象限
   const sl4 = pres.appendSlide();
   clearSlide(sl4);
   setBg(sl4, BG_DARK);
-  addBox(sl4, "5. 顧客象限分析", 15, TY, CW, TH, 17, true, "#60a5fa");
+  addBox(sl4, "4. 顧客象限分析", 15, TY, CW, TH, 17, true, "#60a5fa");
   addBox(sl4, "現在のポジション: 【" + quadrant + "】", 15, CY, CW, 42, 20, true, "#fbbf24");
   addBox(sl4, quadrantMsg, 15, CY+47, CW, 38, 13, false, "#e2e8f0");
   addBox(sl4,
@@ -1714,7 +1679,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   const slIssue = pres.appendSlide();
   clearSlide(slIssue);
   setBg(slIssue, BG_LIGHT);
-  addBox(slIssue, "6. 課題分析", 15, TY, CW, TH, 15, true, ACCENT);
+  addBox(slIssue, "5. 課題分析", 15, TY, CW, TH, 15, true, ACCENT);
   const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
   if (issues.length === 0) {
     addBox(slIssue, "現時点で大きな課題は検出されませんでした。", 15, CY, CW, 45, 12, false, "#64748b");
@@ -1728,7 +1693,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "7. 推奨アクション（ベストプラクティスより）", 15, TY, CW, TH, 14, true, ACCENT);
+  addBox(sl5, "6. 推奨アクション（ベストプラクティスより）", 15, TY, CW, TH, 14, true, ACCENT);
   const strategies = getRelevantStrategies(quadrant, { nextRes: sMain.次回予約率実績 || 0, unitPrice, newGuest: sMain.新規実績 || 0 });
   if (strategies.length > 0) {
     const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
@@ -1742,7 +1707,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "8. その他", 15, TY, CW, TH, 16, true, "#60a5fa");
+  addBox(sl7, "7. その他", 15, TY, CW, TH, 16, true, "#60a5fa");
   addBox(sl7, memo || "（なし）", 15, CY, CW, CH, 13, false, "#e2e8f0");
 
   pres.saveAndClose();
