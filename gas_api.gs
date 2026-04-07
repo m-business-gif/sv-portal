@@ -1471,7 +1471,7 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   doc.saveAndClose();
   // 他アカウントからも閲覧できるようリンク共有を設定
   try {
-    DriveApp.getFileById(doc.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    DriveApp.getFileById(doc.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   } catch(shareErr) { Logger.log("doc share error: " + shareErr); }
   return doc.getUrl();
 }
@@ -1757,7 +1757,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   pres.saveAndClose();
   // 他アカウントからも閲覧できるようリンク共有を設定
   try {
-    DriveApp.getFileById(pres.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    DriveApp.getFileById(pres.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   } catch(shareErr) { Logger.log("slides share error: " + shareErr); }
   return pres.getUrl();
 }
