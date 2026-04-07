@@ -548,10 +548,8 @@ function getStaffRanks() {
 }
 
 function getStaffSales() {
-  const ss = SpreadsheetApp.openById(SS_ID);
-  const ws = ss.getSheetByName(SHEET_SALES);
-  if (!ws) return [];
-  const rows = ws.getDataRange().getValues();
+  const rows = _getSalesRows();
+  if (!rows.length) return [];
   // 正式名称 → 略称に変換してSVポータルと名称を統一
   const nameMap = _getSalesNameMap();
   const map = {};
@@ -897,10 +895,8 @@ function createAgendaExternal(storeName, format, memo) {
 // ─ メニュー構成比取得 ─
 function getMenuRatios(storeName, targetYM) {
   try {
-    const ss = SpreadsheetApp.openById(SS_ID);
-    const ws = ss.getSheetByName(SHEET_SALES);
-    if (!ws) return null;
-    const rows = ws.getDataRange().getValues();
+    const rows = _getSalesRows();
+    if (!rows.length) return null;
     const counts = { matsu:0, mayu:0, matsuMayu:0, matsuMayuPerm:0, other:0 };
     const amounts = { matsu:0, mayu:0, matsuMayu:0, matsuMayuPerm:0, other:0 };
     // 略称 → 正式名称に変換して売上明細を検索
@@ -1134,6 +1130,16 @@ function fixSalesStoreNames(preview) {
 }
 
 // ─ 店舗名マッピング（略称 ↔ 正式名称） ─
+// ─ 売上明細 行キャッシュ（1実行につき1回だけシートを読む）─
+let _salesRowsCache = null;
+function _getSalesRows() {
+  if (_salesRowsCache) return _salesRowsCache;
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_SALES);
+  _salesRowsCache = ws ? ws.getDataRange().getValues() : [];
+  return _salesRowsCache;
+}
+
 // SVポータル各シート: 略称  /  売上明細: 正式名称
 // 実行ごとにキャッシュを保持
 let _salesNameCache = null;
@@ -1144,7 +1150,7 @@ function _getSalesNameMap() {
   const wsSales = ss.getSheetByName(SHEET_SALES);
   const abbrToOfficial = {};
   const officialToAbbr = {};
-  if (!wsGoal || !wsSales) {
+  if (!wsGoal) {
     _salesNameCache = { abbrToOfficial, officialToAbbr };
     return _salesNameCache;
   }
@@ -1154,9 +1160,9 @@ function _getSalesNameMap() {
     const nm = String(r[2] || "").trim();
     if (nm && !abbrNames.includes(nm)) abbrNames.push(nm);
   });
-  // 正式名称一覧（売上明細 A列）
+  // 正式名称一覧（売上明細 A列）- キャッシュ経由
   const officialNames = new Set();
-  wsSales.getDataRange().getValues().slice(1).forEach(r => {
+  _getSalesRows().slice(1).forEach(r => {
     const nm = String(r[0] || "").trim();
     if (nm) officialNames.add(nm);
   });
@@ -1769,14 +1775,13 @@ function getStoreReport(storeName) {
   const nameMap = _getSalesNameMap();
   const officialName = nameMap.abbrToOfficial[storeName] || storeName;
 
-  const ss = SpreadsheetApp.openById(SS_ID);
-  const ws = ss.getSheetByName(SHEET_SALES);
-  if (!ws) return { error: "売上明細シートなし" };
+  const rows = _getSalesRows();
+  if (!rows.length) return { error: "売上明細シートなし" };
 
-  const rows = ws.getDataRange().getValues();
   const monthlyMap = {};
   const menuMap = {};
   const staffMap = {};
+  const kubunMap = {};   // 区分ごとの集計（クーポン・割引含む）
 
   for (let i = 1; i < rows.length; i++) {
     const store = String(rows[i][0] || "").trim();
@@ -1791,6 +1796,13 @@ function getStoreReport(storeName) {
     const amount  = parseFloat(rows[i][12]) || 0;      // M列：金額
     const staff   = String(rows[i][13] || "").trim();  // N列：スタッフ名
     const cnt     = parseFloat(rows[i][11]) || 1;      // L列：件数
+
+    // 区分ごとに集計（全種類）
+    if (kubun) {
+      if (!kubunMap[kubun]) kubunMap[kubun] = { count: 0, sales: 0 };
+      kubunMap[kubun].count += cnt;
+      kubunMap[kubun].sales += amount;
+    }
 
     if (!monthlyMap[ym]) monthlyMap[ym] = { sales: 0, serviceCount: 0 };
 
@@ -1830,7 +1842,12 @@ function getStoreReport(storeName) {
     .slice(0, 15)
     .map(([name, d]) => ({ name, count: d.count, sales: d.sales }));
 
-  return { storeName, officialName, monthly, menus, staff };
+  // クーポン・割引など施術以外の区分をまとめる
+  const kubunSummary = Object.entries(kubunMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([kubun, d]) => ({ kubun, count: d.count, sales: d.sales }));
+
+  return { storeName, officialName, monthly, menus, staff, kubunSummary };
 }
 
 // =============================================
