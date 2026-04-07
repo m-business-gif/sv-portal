@@ -2027,7 +2027,8 @@ const _rptCharts={};
 let _rptData=null;
 function _destroyChart(id){if(_rptCharts[id]){_rptCharts[id].destroy();delete _rptCharts[id];}}
 
-let AGENDA_AUTH_URL=localStorage.getItem("agenda_auth_url")||"";
+const DEFAULT_AGENDA_AUTH_URL="https://script.google.com/macros/s/AKfycbzi1AVCVgK_MJKhik-TZKAhRj8Xj67eBaEQwrRVUO_imXFzy5boG_CrCl0u53I9TngY/exec";
+let AGENDA_AUTH_URL=localStorage.getItem("agenda_auth_url")||DEFAULT_AGENDA_AUTH_URL;
 
 function renderReport(){
   const el=document.getElementById("v-report");if(!el)return;
