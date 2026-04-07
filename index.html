@@ -2042,29 +2042,22 @@ function renderReport(){
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         更新
       </button>
-      <button class="btn-p" style="background:#7c3aed" onclick="openAgendaCreate()">
+      <button class="btn-p" style="background:#7c3aed" onclick="openAgendaCreate()" id="btn-agenda-create">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        アジェンダ作成
+        アジェンダ作成（自分のDriveに保存）
       </button>
     </div>
     <div id="rpt-body" style="color:var(--ink3);font-size:13px">店舗を選択してください</div>`;
   if(cur)loadStoreReport();
 }
-async function openAgendaCreate(){
+const AGENDA_USER_URL="https://script.google.com/macros/s/AKfycbzi1AVCVgK_MJKhik-TZKAhRj8Xj67eBaEQwrRVUO_imXFzy5boG_CrCl0u53I9TngY/exec";
+function openAgendaCreate(){
   const storeSel=document.getElementById("rpt-store-sel");
   const storeName=storeSel?storeSel.value:"";
   if(!storeName){alert("店舗を選択してください");return;}
   const format=confirm("スライドで作成しますか？\n（キャンセル → ドキュメント）")?"slide":"doc";
-  const btn=document.querySelector('[onclick="openAgendaCreate()"]');
-  const origText=btn?btn.innerHTML:"";
-  if(btn){btn.disabled=true;btn.innerHTML="⏳ 作成中...";}
-  try{
-    const res=await fetch(`${API_URL}?action=createAgendaExternal&store=${encodeURIComponent(storeName)}&format=${format}`);
-    const d=await res.json();
-    if(d.url){window.open(d.url,"_blank");}
-    else{alert("エラー: "+(d.error||"不明"));}
-  }catch(e){alert("エラー: "+e.message);}
-  finally{if(btn){btn.disabled=false;btn.innerHTML=origText;}}
+  // 新しいタブで開く → Googleログイン（初回のみ）→ 自分のDriveに保存
+  window.open(`${AGENDA_USER_URL}?action=createAgendaUser&store=${encodeURIComponent(storeName)}&format=${format}`,"_blank");
 }
 
 async function loadStoreReport(){
