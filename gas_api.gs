@@ -1398,23 +1398,8 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   }
   body.appendParagraph("");
 
-  // 4. スタッフ別売上
-  const h4s = body.appendParagraph("4. スタッフ別売上");
-  h4s.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  h4s.editAsText().setForegroundColor("#1e40af").setBold(true);
-  const rptStaff = storeReport && storeReport.staff && storeReport.staff.length > 0 ? storeReport.staff : null;
-  if (rptStaff) {
-    const staffRows = [["スタッフ名", "施術数", "売上"]];
-    rptStaff.slice(0, 10).forEach(st => staffRows.push([st.name, st.count + "件", "¥" + Math.round(st.sales).toLocaleString()]));
-    const ts4 = body.appendTable(staffRows);
-    styleTableHeader(ts4, 3, "#e0f2fe");
-  } else {
-    body.appendParagraph("スタッフデータなし").editAsText().setFontSize(11);
-  }
-  body.appendParagraph("");
-
-  // 5. 課題分析
-  const h4i = body.appendParagraph("5. 課題分析");
+  // 4. 課題分析
+  const h4i = body.appendParagraph("4. 課題分析");
   h4i.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4i.editAsText().setForegroundColor("#1e40af").setBold(true);
   const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
@@ -1428,8 +1413,8 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   }
   body.appendParagraph("");
 
-  // 6. 推奨アクション（ベストプラクティスより）
-  const h4 = body.appendParagraph("6. 推奨アクション（ベストプラクティスより）");
+  // 5. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("5. 推奨アクション（ベストプラクティスより）");
   h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4.editAsText().setForegroundColor("#1e40af").setBold(true);
   const strategies = getRelevantStrategies(quadrant, { nextRes: sMain.次回予約率実績 || 0, unitPrice, newGuest: sMain.新規実績 || 0 });
@@ -1443,8 +1428,8 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   }
   body.appendParagraph("");
 
-  // 7. その他
-  const h6 = body.appendParagraph("7. その他");
+  // 6. その他
+  const h6 = body.appendParagraph("6. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
@@ -1612,41 +1597,11 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
     addBox(sl4m, "メニューデータなし（売上明細シートに施術データが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
   }
 
-  // スライド4: スタッフ別売上
-  const slStaff = pres.appendSlide();
-  clearSlide(slStaff);
-  setBg(slStaff, BG_LIGHT);
-  addBox(slStaff, "3. スタッフ別売上", 15, TY, CW, TH, 15, true, ACCENT);
-  const rptStaff = storeReport && storeReport.staff && storeReport.staff.length > 0 ? storeReport.staff : null;
-  if (rptStaff) {
-    const staffRows = [["スタッフ名", "施術数", "売上"]];
-    rptStaff.slice(0, 10).forEach(st => staffRows.push([st.name, st.count + "件", "¥" + Math.round(st.sales).toLocaleString()]));
-    const staffW = Math.round(CW * 0.5);
-    addTable(slStaff, staffRows, 15, CY, staffW, CH, "#e0f2fe", 9);
-    // 売上ランキングバーチャート
-    try {
-      const staffDt = Charts.newDataTable()
-        .addColumn(Charts.ColumnType.STRING, "スタッフ")
-        .addColumn(Charts.ColumnType.NUMBER, "売上");
-      rptStaff.slice(0, 8).forEach(st => staffDt.addRow([st.name, st.sales]));
-      const staffChart = Charts.newBarChart()
-        .setDataTable(staffDt.build())
-        .setTitle("スタッフ別売上")
-        .setColors(["#0891b2"])
-        .setDimensions(CW - staffW - 5, CH)
-        .setOption("legend.position", "none")
-        .build();
-      slStaff.insertImage(staffChart.getAs("image/png"), 15 + staffW + 5, CY, CW - staffW - 5, CH);
-    } catch(e) { Logger.log("staff chart err: " + e); }
-  } else {
-    addBox(slStaff, "スタッフデータなし（売上明細シートに施術データが必要です）", 15, CY, CW, 50, 12, false, "#64748b");
-  }
-
-  // スライド6: 顧客象限
+  // スライド4: 顧客象限
   const sl4 = pres.appendSlide();
   clearSlide(sl4);
   setBg(sl4, BG_DARK);
-  addBox(sl4, "4. 顧客象限分析", 15, TY, CW, TH, 17, true, "#60a5fa");
+  addBox(sl4, "3. 顧客象限分析", 15, TY, CW, TH, 17, true, "#60a5fa");
   addBox(sl4, "現在のポジション: 【" + quadrant + "】", 15, CY, CW, 42, 20, true, "#fbbf24");
   addBox(sl4, quadrantMsg, 15, CY+47, CW, 38, 13, false, "#e2e8f0");
   addBox(sl4,
@@ -1659,7 +1614,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   const slIssue = pres.appendSlide();
   clearSlide(slIssue);
   setBg(slIssue, BG_LIGHT);
-  addBox(slIssue, "5. 課題分析", 15, TY, CW, TH, 15, true, ACCENT);
+  addBox(slIssue, "4. 課題分析", 15, TY, CW, TH, 15, true, ACCENT);
   const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
   if (issues.length === 0) {
     addBox(slIssue, "現時点で大きな課題は検出されませんでした。", 15, CY, CW, 45, 12, false, "#64748b");
@@ -1673,7 +1628,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   const sl5 = pres.appendSlide();
   clearSlide(sl5);
   setBg(sl5, BG_LIGHT);
-  addBox(sl5, "6. 推奨アクション（ベストプラクティスより）", 15, TY, CW, TH, 14, true, ACCENT);
+  addBox(sl5, "5. 推奨アクション（ベストプラクティスより）", 15, TY, CW, TH, 14, true, ACCENT);
   const strategies = getRelevantStrategies(quadrant, { nextRes: sMain.次回予約率実績 || 0, unitPrice, newGuest: sMain.新規実績 || 0 });
   if (strategies.length > 0) {
     const stratRows = [["施策名", "対象KPI", "重要度", "推奨タイミング"]];
@@ -1687,7 +1642,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   const sl7 = pres.appendSlide();
   clearSlide(sl7);
   setBg(sl7, BG_DARK);
-  addBox(sl7, "7. その他", 15, TY, CW, TH, 16, true, "#60a5fa");
+  addBox(sl7, "6. その他", 15, TY, CW, TH, 16, true, "#60a5fa");
   addBox(sl7, memo || "（なし）", 15, CY, CW, CH, 13, false, "#e2e8f0");
 
   pres.saveAndClose();
