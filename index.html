@@ -438,7 +438,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbwvwurPvoytVijzMquqw7ThldsWfyL982wbtqxw0pwwvz78E06peppE50KUzxhpcCSO/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbz0qE3t4nJMm3qfPrmcWW1H6AEHcoCLRK8UGVDVuWOO14Gbg4Rq1TnFoAkYCaCH5aP1/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
@@ -1954,11 +1954,11 @@ function setAlertFilter(f,btn){
 
 // ─ 店舗レポート ─
 const _rptCharts={};
+let _rptData=null;
 function _destroyChart(id){if(_rptCharts[id]){_rptCharts[id].destroy();delete _rptCharts[id];}}
 
 function renderReport(){
   const el=document.getElementById("v-report");if(!el)return;
-  // 店舗リスト生成
   const storeNames=[...new Set(stores.map(s=>s.name))].sort((a,b)=>a.localeCompare(b,"ja"));
   const sel=document.getElementById("rpt-store-sel");
   const cur=sel?sel.value:"";
@@ -1983,217 +1983,229 @@ async function loadStoreReport(){
   const storeName=sel.value;
   const body=document.getElementById("rpt-body");
   body.innerHTML=`<div style="display:flex;align-items:center;gap:8px;color:var(--ink3)"><div class="spinner"></div> データ取得中...</div>`;
-
   try{
     const res=await fetch(`${API_URL}?action=getStoreReport&store=${encodeURIComponent(storeName)}`);
     const d=await res.json();
     if(d.error){body.innerHTML=`<div style="color:var(--red)">${d.error}</div>`;return;}
+    _rptData=d;
     renderStoreReport(d,body);
   }catch(e){
     body.innerHTML=`<div style="color:var(--red)">取得エラー: ${e.message}</div>`;
   }
 }
 
+function switchReportMonth(){
+  if(!_rptData)return;
+  const sel=document.getElementById("rpt-ym-sel");
+  const ym=sel?parseInt(sel.value)||0:0;
+  updateReportMonthView(ym);
+}
+
 function renderStoreReport(d,body){
   const CC=["#2563eb","#7c3aed","#0891b2","#059669","#c2410c","#d97706","#db2777","#65a30d","#0284c7","#9333ea","#b45309","#0f766e"];
   const monthly=d.monthly||[];
-  const menus=d.menus||[];
-  const staff=d.staff||[];
+  const allMenuNames=(d.allMenuNames||[]).slice(0,8);
   const monthlyMenus=d.monthlyMenus||[];
-  const allMenuNames=d.allMenuNames||[];
-  const mLabels=monthly.map(m=>m.label);
-  const totalSales=monthly.reduce((s,m)=>s+m.sales,0);
-  const totalCount=monthly.reduce((s,m)=>s+m.serviceCount,0);
-  const avgUnit=totalCount>0?Math.round(totalSales/totalCount):0;
-  const topMenuNames=allMenuNames.slice(0,8);
 
-  // 月別メニュー件数の合計（比率計算用）
-  const mmTotals=monthlyMenus.map(m=>topMenuNames.reduce((s,_,i)=>s+m.counts[i],0));
-
-  const card=(label,val)=>`<div style="background:var(--sur);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)">
-    <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">${label}</div>
-    <div style="font-size:20px;font-weight:700;font-family:'Outfit',sans-serif">${val}</div>
-  </div>`;
+  // デフォルト：最新月
+  const latestYM=monthly.length?monthly[monthly.length-1].ym:0;
 
   body.innerHTML=`
-    <div style="margin-bottom:10px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-      <span style="font-size:18px;font-weight:700;font-family:'Outfit',sans-serif">${d.storeName}</span>
-      <span style="font-size:11px;color:var(--ink3)">売上明細 ${monthly.length}ヶ月分</span>
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:17px;font-weight:700;font-family:'Outfit',sans-serif">${d.storeName}</span>
+      <select class="sel" id="rpt-ym-sel" style="min-width:100px" onchange="switchReportMonth()">
+        ${monthly.map(m=>`<option value="${m.ym}"${m.ym===latestYM?" selected":""}>${m.ym.toString().slice(0,4)}/${m.ym.toString().slice(4)}</option>`).reverse().join("")}
+      </select>
+      <span style="font-size:11px;color:var(--ink3)">（データ: ${monthly.length}ヶ月分）</span>
     </div>
 
-    <!-- サマリーカード -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-      ${card("累計売上（施術）",fm(totalSales))}
-      ${card("累計施術件数",totalCount.toLocaleString()+"件")}
-      ${card("平均客単価",avgUnit.toLocaleString()+"円")}
-    </div>
+    <!-- サマリーカード（月別） -->
+    <div id="rpt-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
 
-    <!-- 月別売上 + 客単価推移 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">月別売上推移</div>
-        <canvas id="rpt-c-sales" height="180"></canvas>
+    <!-- トレンドグラフ（全期間） -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">売上推移（全期間）</div>
+        <canvas id="rpt-c-sales" height="160"></canvas>
       </div>
-      <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:12px">月別施術数・客単価</div>
-        <canvas id="rpt-c-unit" height="180"></canvas>
-      </div>
-    </div>
-
-    <!-- 月別メニュー推移（件数積み上げ） -->
-    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:4px">月別メニュー推移（件数）</div>
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">どのメニューが増減しているか</div>
-      <canvas id="rpt-c-mmtrend" height="140"></canvas>
-    </div>
-
-    <!-- メニュー比率（ドーナツ+表） -->
-    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:12px">メニュー構成比</div>
-      <div style="display:grid;grid-template-columns:160px 1fr;gap:20px;align-items:flex-start">
-        <div>
-          <div style="font-size:10px;color:var(--ink3);margin-bottom:6px;text-align:center">件数比率</div>
-          <canvas id="rpt-c-menu-cnt" width="150" height="150"></canvas>
-        </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px">
-            <thead><tr style="border-bottom:1px solid var(--bdr)">
-              <th style="text-align:left;padding:5px 4px;color:var(--ink3)">メニュー</th>
-              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">件数</th>
-              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">件数%</th>
-              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">売上</th>
-              <th style="text-align:right;padding:5px 4px;color:var(--ink3)">平均単価</th>
-            </tr></thead>
-            <tbody>${(()=>{
-              const tot=menus.reduce((s,m)=>s+m.count,0);
-              return menus.map((m,i)=>`<tr style="border-bottom:1px solid var(--bdr2)">
-                <td style="padding:5px 4px;display:flex;align-items:center;gap:5px">
-                  <span style="width:8px;height:8px;border-radius:2px;background:${CC[i%CC.length]};flex-shrink:0;display:inline-block"></span>${m.name}
-                </td>
-                <td style="text-align:right;color:var(--ink2)">${m.count}</td>
-                <td style="text-align:right;font-weight:600">${tot>0?Math.round(m.count/tot*100):0}%</td>
-                <td style="text-align:right">${fm(m.sales)}</td>
-                <td style="text-align:right;color:var(--ink2)">${m.avgPrice.toLocaleString()}円</td>
-              </tr>`).join("");
-            })()}</tbody>
-          </table>
-        </div>
+      <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">施術数・客単価推移</div>
+        <canvas id="rpt-c-unit" height="160"></canvas>
       </div>
     </div>
 
-    <!-- 月別メニュー比率推移（%積み上げ）-->
-    <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh);margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:4px">月別メニュー比率推移（%）</div>
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">メニュー構成がどう変化しているか</div>
-      <canvas id="rpt-c-mmpct" height="140"></canvas>
+    <!-- メニュー構成（選択月） -->
+    <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh);margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:4px">メニュー構成比 <span id="rpt-menu-label" style="font-weight:400;color:var(--ink3)"></span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:flex-start;margin-top:10px">
+        <canvas id="rpt-c-menu-cnt" width="140" height="140"></canvas>
+        <div id="rpt-menu-tbl" style="overflow-x:auto"></div>
+      </div>
     </div>
 
-    <!-- スタッフ別売上 + 区分サマリー -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:10px">スタッフ別売上（上位10名）</div>
-        <canvas id="rpt-c-staff" height="200"></canvas>
+    <!-- 月別メニュー比率推移 -->
+    <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh);margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:2px">メニュー比率の変化（月別・%）</div>
+      <div style="font-size:10px;color:var(--ink3);margin-bottom:8px">各メニューの構成割合が月ごとにどう変わっているか</div>
+      <canvas id="rpt-c-mmpct" height="130"></canvas>
+    </div>
+
+    <!-- スタッフ + 区分 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">スタッフ別売上 <span id="rpt-staff-label" style="font-weight:400;color:var(--ink3)"></span></div>
+        <canvas id="rpt-c-staff" height="180"></canvas>
       </div>
-      <div style="background:var(--sur);border-radius:var(--r);padding:16px;box-shadow:var(--sh)">
-        <div style="font-size:12px;font-weight:700;margin-bottom:10px">区分別サマリー</div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">区分別サマリー（全期間）</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead><tr style="border-bottom:1px solid var(--bdr)">
             <th style="text-align:left;padding:4px 0;color:var(--ink3)">区分</th>
             <th style="text-align:right;padding:4px 0;color:var(--ink3)">件数</th>
             <th style="text-align:right;padding:4px 0;color:var(--ink3)">金額</th>
           </tr></thead>
           <tbody>${(d.kubunSummary||[]).map(k=>{
-            const isCoupon=k.kubun.includes("クーポン")||k.kubun.includes("割引")||k.sales<0;
-            return`<tr style="border-bottom:1px solid var(--bdr2)${isCoupon?";background:var(--amb2)":""}">
-              <td style="padding:5px 0;font-weight:${isCoupon?700:400}">${k.kubun}${isCoupon?" 🏷":""}${k.kubun==="施術"?" ✓":""}</td>
+            const isC=k.kubun.includes("クーポン")||k.kubun.includes("割引")||k.sales<0||k.kubun.includes("特典");
+            const details=(k.details||[]);
+            const detailHtml=details.length?`<tr style="background:var(--amb2)"><td colspan="3" style="padding:0 4px 6px 16px">
+              ${details.map(dt=>`<span style="font-size:10px;color:var(--ink2);margin-right:8px">🏷 ${dt.name}（${dt.count}件）</span>`).join("")}
+            </td></tr>`:"";
+            return`<tr style="border-bottom:${details.length?"none":"1px solid var(--bdr2)"}${isC?";background:var(--amb2)":""}">
+              <td style="padding:4px 0">${k.kubun}${isC?" 🏷":""}${k.kubun==="施術"?" ✓":""}</td>
               <td style="text-align:right;color:var(--ink2)">${k.count}</td>
               <td style="text-align:right;font-weight:600;color:${k.sales<0?"var(--red)":"inherit"}">${k.sales<0?"-":""}${fm(Math.abs(k.sales))}</td>
-            </tr>`;
+            </tr>${detailHtml}`;
           }).join("")}</tbody>
         </table>
       </div>
     </div>`;
 
-  // ── チャート描画 ──
+  const mLabels=monthly.map(m=>m.label);
 
-  // 月別売上
+  // 売上推移（全期間）- 選択月をハイライト
   _destroyChart("sales");
   _rptCharts["sales"]=new Chart(document.getElementById("rpt-c-sales"),{
     type:"bar",
-    data:{labels:mLabels,datasets:[{label:"売上",data:monthly.map(m=>m.sales),backgroundColor:"rgba(37,99,235,.7)",borderRadius:4}]},
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fm(v)},grid:{color:"rgba(0,0,0,.05)"}}}}
+    data:{labels:mLabels,datasets:[{
+      label:"売上",
+      data:monthly.map(m=>m.sales),
+      backgroundColor:monthly.map(m=>m.ym===latestYM?"rgba(37,99,235,.9)":"rgba(37,99,235,.4)"),
+      borderRadius:4
+    }]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>"¥"+c.raw.toLocaleString()}}},
+      scales:{y:{ticks:{callback:v=>fm(v)},grid:{color:"rgba(0,0,0,.04)"}}}}
   });
 
-  // 月別施術数 + 客単価
+  // 施術数 + 客単価
   _destroyChart("unit");
   _rptCharts["unit"]=new Chart(document.getElementById("rpt-c-unit"),{
     type:"bar",
     data:{labels:mLabels,datasets:[
       {label:"施術数",data:monthly.map(m=>m.serviceCount),backgroundColor:"rgba(124,58,237,.5)",borderRadius:4,yAxisID:"y1"},
-      {label:"客単価",data:monthly.map(m=>m.unitPrice),type:"line",borderColor:"#c2410c",backgroundColor:"rgba(194,65,12,.1)",pointRadius:4,yAxisID:"y2",tension:.3}
+      {label:"客単価",data:monthly.map(m=>m.unitPrice),type:"line",borderColor:"#c2410c",backgroundColor:"transparent",pointRadius:4,pointBackgroundColor:monthly.map(m=>m.ym===latestYM?"#c2410c":"#c2410c88"),yAxisID:"y2",tension:.3}
     ]},
-    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10}}}},scales:{
-      y1:{position:"left",ticks:{stepSize:1},grid:{color:"rgba(0,0,0,.05)"}},
-      y2:{position:"right",ticks:{callback:v=>v.toLocaleString()+"円"},grid:{display:false}}
-    }}
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>c.datasetIndex===1?"¥"+c.raw.toLocaleString()+"円":c.raw+"件"}}},
+      scales:{y1:{position:"left",grid:{color:"rgba(0,0,0,.04)"}},y2:{position:"right",ticks:{callback:v=>v.toLocaleString()+"円"},grid:{display:false}}}}
   });
 
-  // 月別メニュー推移（件数積み上げ棒）
-  _destroyChart("mmtrend");
-  _rptCharts["mmtrend"]=new Chart(document.getElementById("rpt-c-mmtrend"),{
-    type:"bar",
-    data:{
-      labels:monthlyMenus.map(m=>m.label),
-      datasets:topMenuNames.map((name,i)=>({
-        label:name,
-        data:monthlyMenus.map(m=>m.counts[i]),
-        backgroundColor:CC[i%CC.length]+"cc",
-        borderRadius:2,
-        stack:"s"
-      }))
-    },
-    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}},
-      scales:{x:{stacked:true},y:{stacked:true,ticks:{stepSize:5},grid:{color:"rgba(0,0,0,.04)"}}}}
-  });
-
-  // メニュー件数ドーナツ
-  _destroyChart("menuCnt");
-  const topM=menus.slice(0,8);
-  const otherCnt=menus.slice(8).reduce((s,m)=>s+m.count,0);
-  const cntLabels=[...topM.map(m=>m.name),...(otherCnt>0?["その他"]:[])];
-  const cntData=[...topM.map(m=>m.count),...(otherCnt>0?[otherCnt]:[])];
-  _rptCharts["menuCnt"]=new Chart(document.getElementById("rpt-c-menu-cnt"),{
-    type:"doughnut",
-    data:{labels:cntLabels,datasets:[{data:cntData,backgroundColor:CC.slice(0,cntLabels.length),borderWidth:1}]},
-    options:{responsive:false,plugins:{legend:{display:false}}}
-  });
-
-  // 月別メニュー比率（%積み上げ）
+  // メニュー比率推移（全期間・%積み上げ）
+  const mmTotals=monthlyMenus.map(m=>allMenuNames.reduce((s,_,i)=>s+m.counts[i],0));
   _destroyChart("mmpct");
   _rptCharts["mmpct"]=new Chart(document.getElementById("rpt-c-mmpct"),{
     type:"bar",
     data:{
       labels:monthlyMenus.map(m=>m.label),
-      datasets:topMenuNames.map((name,i)=>({
+      datasets:allMenuNames.map((name,i)=>({
         label:name,
-        data:monthlyMenus.map((m,mi)=>mmTotals[mi]>0?Math.round(m.counts[i]/mmTotals[mi]*100):0),
-        backgroundColor:CC[i%CC.length]+"cc",
-        borderRadius:2,
+        data:monthlyMenus.map((m,mi)=>mmTotals[mi]>0?+(m.counts[i]/mmTotals[mi]*100).toFixed(1):0),
+        backgroundColor:CC[i%CC.length],
         stack:"s"
       }))
     },
-    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}}},
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+c.raw+"%"}}},
       scales:{x:{stacked:true},y:{stacked:true,max:100,ticks:{callback:v=>v+"%"},grid:{color:"rgba(0,0,0,.04)"}}}}
   });
 
-  // スタッフ別売上
+  // 月別ビュー（選択月分）を描画
+  updateReportMonthView(latestYM);
+}
+
+function updateReportMonthView(ym){
+  if(!_rptData)return;
+  const CC=["#2563eb","#7c3aed","#0891b2","#059669","#c2410c","#d97706","#db2777","#65a30d","#0284c7","#9333ea","#b45309","#0f766e"];
+  const monthly=_rptData.monthly||[];
+  const allMenuNames=(_rptData.allMenuNames||[]).slice(0,8);
+  const monthlyMenus=_rptData.monthlyMenus||[];
+  const staffByMonth=_rptData.staffByMonth||{};
+
+  const mo=monthly.find(m=>m.ym===ym)||{sales:0,serviceCount:0,unitPrice:0};
+  const ymLabel=ym?ym.toString().slice(0,4)+"/"+ym.toString().slice(4):"";
+
+  // サマリーカード
+  const cards=document.getElementById("rpt-cards");
+  if(cards){
+    const card=(label,val)=>`<div style="background:var(--sur);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)">
+      <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">${label}</div>
+      <div style="font-size:19px;font-weight:700;font-family:'Outfit',sans-serif">${val}</div>
+    </div>`;
+    cards.innerHTML=card(ymLabel+" 売上",fm(mo.sales))+card(ymLabel+" 施術数",mo.serviceCount+"件")+card(ymLabel+" 客単価",mo.unitPrice.toLocaleString()+"円");
+  }
+
+  // 売上推移グラフ：選択月をハイライト
+  if(_rptCharts["sales"]){
+    _rptCharts["sales"].data.datasets[0].backgroundColor=monthly.map(m=>m.ym===ym?"rgba(37,99,235,.95)":"rgba(37,99,235,.35)");
+    _rptCharts["sales"].update();
+  }
+
+  // メニュー構成（選択月）
+  const mmIdx=monthlyMenus.findIndex(m=>m.ym===ym);
+  const counts=mmIdx>=0?monthlyMenus[mmIdx].counts:allMenuNames.map(()=>0);
+  const totalCnt=counts.reduce((s,v)=>s+v,0);
+  const lbl=document.getElementById("rpt-menu-label");
+  if(lbl)lbl.textContent=ymLabel;
+  _destroyChart("menuCnt");
+  const menuEl=document.getElementById("rpt-c-menu-cnt");
+  if(menuEl){
+    _rptCharts["menuCnt"]=new Chart(menuEl,{
+      type:"doughnut",
+      data:{labels:allMenuNames,datasets:[{data:counts,backgroundColor:CC.slice(0,allMenuNames.length),borderWidth:2,borderColor:"var(--bg)"}]},
+      options:{responsive:false,cutout:"60%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+c.raw+"件 ("+( totalCnt>0?Math.round(c.raw/totalCnt*100):0)+"%)"}}}}}
+    );
+  }
+  const tbl=document.getElementById("rpt-menu-tbl");
+  if(tbl){
+    tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="border-bottom:1px solid var(--bdr)">
+        <th style="text-align:left;padding:4px;color:var(--ink3)">メニュー</th>
+        <th style="text-align:right;padding:4px;color:var(--ink3)">件数</th>
+        <th style="text-align:right;padding:4px;color:var(--ink3)">構成比</th>
+      </tr></thead>
+      <tbody>${allMenuNames.map((name,i)=>`<tr style="border-bottom:1px solid var(--bdr2)">
+        <td style="padding:4px;display:flex;align-items:center;gap:5px">
+          <span style="width:8px;height:8px;border-radius:2px;background:${CC[i%CC.length]};flex-shrink:0;display:inline-block"></span>${name}
+        </td>
+        <td style="text-align:right;color:var(--ink2)">${counts[i]}</td>
+        <td style="text-align:right;font-weight:600">${totalCnt>0?Math.round(counts[i]/totalCnt*100):0}%</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  // スタッフ（選択月）
+  const staffLbl=document.getElementById("rpt-staff-label");
+  if(staffLbl)staffLbl.textContent=ymLabel;
   _destroyChart("staff");
-  const topStaff=staff.slice(0,10);
-  _rptCharts["staff"]=new Chart(document.getElementById("rpt-c-staff"),{
-    type:"bar",
-    data:{labels:topStaff.map(s=>s.name),datasets:[{label:"売上",data:topStaff.map(s=>s.sales),backgroundColor:"rgba(8,145,178,.65)",borderRadius:4}]},
-    options:{indexAxis:"y",responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fm(v)},grid:{color:"rgba(0,0,0,.05)"}}}}
-  });
+  const staffEl=document.getElementById("rpt-c-staff");
+  const monthStaff=(staffByMonth[ym]||[]).slice(0,10);
+  if(staffEl&&monthStaff.length){
+    _rptCharts["staff"]=new Chart(staffEl,{
+      type:"bar",
+      data:{labels:monthStaff.map(s=>s.name),datasets:[{label:"売上",data:monthStaff.map(s=>s.sales),backgroundColor:"rgba(8,145,178,.7)",borderRadius:4}]},
+      options:{indexAxis:"y",responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>"¥"+c.raw.toLocaleString()}}},
+        scales:{x:{ticks:{callback:v=>fm(v)},grid:{color:"rgba(0,0,0,.04)"}}}}
+    });
+  } else if(staffEl){
+    staffEl.parentElement.innerHTML+='<div style="font-size:12px;color:var(--ink3);margin-top:8px">この月のスタッフデータなし</div>';
+  }
 }
 </script>
 </body>
