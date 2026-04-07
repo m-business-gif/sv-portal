@@ -2027,15 +2027,11 @@ const _rptCharts={};
 let _rptData=null;
 function _destroyChart(id){if(_rptCharts[id]){_rptCharts[id].destroy();delete _rptCharts[id];}}
 
-const DEFAULT_AGENDA_AUTH_URL="https://script.google.com/macros/s/AKfycbzi1AVCVgK_MJKhik-TZKAhRj8Xj67eBaEQwrRVUO_imXFzy5boG_CrCl0u53I9TngY/exec";
-let AGENDA_AUTH_URL=localStorage.getItem("agenda_auth_url")||DEFAULT_AGENDA_AUTH_URL;
-
 function renderReport(){
   const el=document.getElementById("v-report");if(!el)return;
   const storeNames=[...new Set(stores.map(s=>s.name))].sort((a,b)=>a.localeCompare(b,"ja"));
   const sel=document.getElementById("rpt-store-sel");
   const cur=sel?sel.value:"";
-  const agendaUrlSet=!!AGENDA_AUTH_URL;
   el.innerHTML=`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
       <select class="sel" id="rpt-store-sel" style="min-width:180px" onchange="loadStoreReport()">
@@ -2046,48 +2042,29 @@ function renderReport(){
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         更新
       </button>
-      ${agendaUrlSet?`
       <button class="btn-p" style="background:#7c3aed" onclick="openAgendaCreate()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
         アジェンダ作成
-      </button>`:``}
-      <button style="padding:6px 12px;border:1px solid var(--bdr);border-radius:6px;background:var(--sur);font-size:11px;color:var(--ink3);cursor:pointer" onclick="showAgendaUrlSetting()">${agendaUrlSet?"⚙ アジェンダURL設定済":"⚙ アジェンダURL未設定"}</button>
+      </button>
     </div>
-    <div id="rpt-body" style="color:var(--ink3);font-size:13px">店舗を選択してください</div>
-    <div id="agenda-url-panel" style="display:none;background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:16px 18px;margin-top:12px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px">アジェンダ作成URL（USER_ACCESSINGデプロイ）</div>
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">GASエディタ → デプロイ → 新しいデプロイ → 「次のユーザーとして実行: ウェブアプリにアクセスしているユーザー」で作成し、URLを貼り付けてください。</div>
-      <div style="display:flex;gap:8px">
-        <input id="agenda-url-inp" type="text" style="flex:1;padding:8px 10px;border:1px solid var(--bdr);border-radius:6px;font-size:12px;font-family:monospace" placeholder="https://script.google.com/macros/s/..." value="${AGENDA_AUTH_URL}">
-        <button class="btn-p" onclick="saveAgendaAuthUrl()">保存</button>
-        ${AGENDA_AUTH_URL?`<button style="padding:7px 12px;border:1px solid var(--bdr);border-radius:6px;background:var(--red2);color:var(--red);font-size:12px;cursor:pointer" onclick="clearAgendaAuthUrl()">削除</button>`:""}
-      </div>
-    </div>`;
+    <div id="rpt-body" style="color:var(--ink3);font-size:13px">店舗を選択してください</div>`;
   if(cur)loadStoreReport();
 }
-function showAgendaUrlSetting(){
-  const p=document.getElementById("agenda-url-panel");
-  if(p)p.style.display=p.style.display==="none"?"":"none";
-}
-function saveAgendaAuthUrl(){
-  const v=document.getElementById("agenda-url-inp").value.trim();
-  AGENDA_AUTH_URL=v;
-  localStorage.setItem("agenda_auth_url",v);
-  renderReport();
-}
-function clearAgendaAuthUrl(){
-  AGENDA_AUTH_URL="";
-  localStorage.removeItem("agenda_auth_url");
-  renderReport();
-}
-function openAgendaCreate(){
+async function openAgendaCreate(){
   const storeSel=document.getElementById("rpt-store-sel");
   const storeName=storeSel?storeSel.value:"";
   if(!storeName){alert("店舗を選択してください");return;}
-  if(!AGENDA_AUTH_URL){alert("アジェンダURLが設定されていません");return;}
   const format=confirm("スライドで作成しますか？\n（キャンセル → ドキュメント）")?"slide":"doc";
-  const url=AGENDA_AUTH_URL+"?action=createAgendaUser&store="+encodeURIComponent(storeName)+"&format="+format;
-  window.open(url,"_blank");
+  const btn=document.querySelector('[onclick="openAgendaCreate()"]');
+  const origText=btn?btn.innerHTML:"";
+  if(btn){btn.disabled=true;btn.innerHTML="⏳ 作成中...";}
+  try{
+    const res=await fetch(`${API_URL}?action=createAgendaExternal&store=${encodeURIComponent(storeName)}&format=${format}`);
+    const d=await res.json();
+    if(d.url){window.open(d.url,"_blank");}
+    else{alert("エラー: "+(d.error||"不明"));}
+  }catch(e){alert("エラー: "+e.message);}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=origText;}}
 }
 
 async function loadStoreReport(){
