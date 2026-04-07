@@ -1413,28 +1413,8 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   }
   body.appendParagraph("");
 
-  // 5. 月別推移（売上明細より）
-  const h5m = body.appendParagraph("5. 月別推移（9〜3月）");
-  h5m.setHeading(DocumentApp.ParagraphHeading.HEADING2);
-  h5m.editAsText().setForegroundColor("#1e40af").setBold(true);
-  const rptMonthly = storeReport && storeReport.monthly && storeReport.monthly.length > 0 ? storeReport.monthly : null;
-  if (rptMonthly) {
-    const mRows = [["月", "売上", "施術数", "客単価"]];
-    rptMonthly.forEach(m => mRows.push([
-      m.label,
-      "¥" + Math.round(m.sales).toLocaleString(),
-      m.serviceCount + "件",
-      "¥" + Math.round(m.unitPrice).toLocaleString()
-    ]));
-    const tm5 = body.appendTable(mRows);
-    styleTableHeader(tm5, 4, "#fef9c3");
-  } else {
-    body.appendParagraph("月別データなし").editAsText().setFontSize(11);
-  }
-  body.appendParagraph("");
-
-  // 6. 課題分析
-  const h4i = body.appendParagraph("6. 課題分析");
+  // 5. 課題分析
+  const h4i = body.appendParagraph("5. 課題分析");
   h4i.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4i.editAsText().setForegroundColor("#1e40af").setBold(true);
   const issues = generateIssues(sPrev || s, unitPrice, unitGoal, newRatio);
@@ -1448,8 +1428,8 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   }
   body.appendParagraph("");
 
-  // 7. 推奨アクション（ベストプラクティスより）
-  const h4 = body.appendParagraph("7. 推奨アクション（ベストプラクティスより）");
+  // 6. 推奨アクション（ベストプラクティスより）
+  const h4 = body.appendParagraph("6. 推奨アクション（ベストプラクティスより）");
   h4.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h4.editAsText().setForegroundColor("#1e40af").setBold(true);
   const strategies = getRelevantStrategies(quadrant, { nextRes: sMain.次回予約率実績 || 0, unitPrice, newGuest: sMain.新規実績 || 0 });
@@ -1463,8 +1443,8 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
   }
   body.appendParagraph("");
 
-  // 8. その他
-  const h6 = body.appendParagraph("8. その他");
+  // 7. その他
+  const h6 = body.appendParagraph("7. その他");
   h6.setHeading(DocumentApp.ParagraphHeading.HEADING2);
   h6.editAsText().setForegroundColor("#1e40af").setBold(true);
   body.appendParagraph(memo || "（なし）").editAsText().setFontSize(11);
