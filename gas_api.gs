@@ -1752,15 +1752,37 @@ function getStoreReport(storeName, staffYM) {
   const nameMap = _getSalesNameMap();
   const officialName = nameMap.abbrToOfficial[storeName] || storeName;
 
+  // ── 実数値シートから月次サマリー（売上・客数・客単価）を取得 ──
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const rowsR = ss.getSheetByName(SHEET_REAL).getDataRange().getValues();
+  const normStore = _normalizeForMatch(storeName);
+  const realMap = {}; // ym → {sales, newGuest, repeat, totalGuest, unitPrice, serviceUnitPrice}
+  for (let i = 1; i < rowsR.length; i++) {
+    const nm = String(rowsR[i][2] || "").trim();
+    if (!nm) continue;
+    if (_normalizeForMatch(nm) !== normStore) continue;
+    const dv = Math.round(parseFloat(rowsR[i][3]) || 0);
+    if (dv < 200001) continue;
+    realMap[dv] = {
+      sales:          parseFloat(rowsR[i][5])  || 0,
+      newGuest:       parseFloat(rowsR[i][6])  || 0,
+      repeat:         parseFloat(rowsR[i][7])  || 0,
+      totalGuest:     parseFloat(rowsR[i][8])  || 0,
+      unitPrice:      parseFloat(rowsR[i][9])  || 0,
+      serviceUnitPrice: parseFloat(rowsR[i][10]) || 0,
+    };
+  }
+
   const rows = _getSalesRows();
   if (!rows.length) return { error: "売上明細シートなし" };
 
-  const monthlyMap = {};
+  const salesMonthSet = new Set(); // 売上明細に存在する月
   const menuMap = {};
   const monthlyMenuMap = {};
   const staffMap = {};
   const staffByMonthMap = {};  // ym → { staffName: {count, sales} }
   const kubunMap = {};
+  const serviceCountMap = {}; // ym → 施術件数
 
   for (let i = 1; i < rows.length; i++) {
     const store = String(rows[i][SC_NAME] || "").trim();
@@ -1769,6 +1791,7 @@ function getStoreReport(storeName, staffYM) {
     const dn = parseFloat(rows[i][SC_DATE]) || 0;
     const ym = Math.floor(dn / 100);
     if (!ym || ym < 200001) continue;
+    salesMonthSet.add(ym);
 
     const kubun    = String(rows[i][SC_KUBUN] || "").trim();
     const category = String(rows[i][SC_CAT]   || "").trim();
@@ -1782,38 +1805,30 @@ function getStoreReport(storeName, staffYM) {
       if (!kubunMap[kubun]) kubunMap[kubun] = { count: 0, sales: 0, details: {} };
       kubunMap[kubun].count += cnt;
       kubunMap[kubun].sales += amount;
-      // クーポン系はカテゴリ名まで記録
       const isCoupon = kubun.includes("クーポン") || kubun.includes("割引") || kubun.includes("特典");
       if (isCoupon && menuKey) {
         kubunMap[kubun].details[menuKey] = (kubunMap[kubun].details[menuKey] || 0) + cnt;
       }
     }
 
-    if (!monthlyMap[ym]) monthlyMap[ym] = { sales: 0, serviceCount: 0 };
-    // 全kubunの売上を月次合計に含める
-    monthlyMap[ym].sales += amount;
-
     if (kubun === "施術") {
-      monthlyMap[ym].serviceCount += cnt;
+      serviceCountMap[ym] = (serviceCountMap[ym] || 0) + cnt;
 
       if (menuKey) {
         if (!menuMap[menuKey]) menuMap[menuKey] = { count: 0, sales: 0 };
         menuMap[menuKey].count += cnt;
         menuMap[menuKey].sales += amount;
 
-        // 月別メニュー件数
         if (!monthlyMenuMap[ym]) monthlyMenuMap[ym] = {};
         monthlyMenuMap[ym][menuKey] = (monthlyMenuMap[ym][menuKey] || 0) + cnt;
       }
 
       if (staff) {
-        // 全期間累計
         if (!staffYM || ym === staffYM) {
           if (!staffMap[staff]) staffMap[staff] = { count: 0, sales: 0 };
           staffMap[staff].count += cnt;
           staffMap[staff].sales += amount;
         }
-        // 月別スタッフ集計
         if (!staffByMonthMap[ym]) staffByMonthMap[ym] = {};
         if (!staffByMonthMap[ym][staff]) staffByMonthMap[ym][staff] = { count: 0, sales: 0 };
         staffByMonthMap[ym][staff].count += cnt;
@@ -1822,15 +1837,29 @@ function getStoreReport(storeName, staffYM) {
     }
   }
 
-  const months = Object.keys(monthlyMap).map(Number).sort();
-  const monthly = months.map(ym => ({
-    ym,
-    label: (ym % 100) + "月",
-    sales: monthlyMap[ym].sales,
-    serviceCount: monthlyMap[ym].serviceCount,
-    unitPrice: monthlyMap[ym].serviceCount > 0
-      ? Math.round(monthlyMap[ym].sales / monthlyMap[ym].serviceCount) : 0
-  }));
+  // 月一覧：実数値シートにある月を優先、売上明細にしかない月も含める
+  const allYMs = new Set([...Object.keys(realMap).map(Number), ...salesMonthSet]);
+  const months = Array.from(allYMs).sort();
+
+  const monthly = months
+    .map(ym => {
+      const r = realMap[ym] || {};
+      const svcCnt = serviceCountMap[ym] || 0;
+      const sales = r.sales || 0;
+      const up = Math.round(r.unitPrice) || (svcCnt > 0 ? Math.round(sales / svcCnt) : 0);
+      return {
+        ym,
+        label: (ym % 100) + "月",
+        sales,
+        serviceCount: svcCnt,
+        unitPrice: up,
+        newGuest: r.newGuest || 0,
+        repeat: r.repeat || 0,
+        totalGuest: r.totalGuest || 0,
+        serviceUnitPrice: Math.round(r.serviceUnitPrice) || 0,
+      };
+    })
+    .filter(m => m.sales > 0 || m.serviceCount > 0); // データなし月を除外
 
   const menus = Object.entries(menuMap)
     .sort((a, b) => b[1].count - a[1].count)
