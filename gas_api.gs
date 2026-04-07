@@ -135,6 +135,33 @@ function doGet(e) {
       );
       return json({ ok: true, url });
     }
+    // アジェンダ作成（認証済みユーザーのドライブに保存）
+    // USER_ACCESSING デプロイ専用。ブラウザタブで開く → 作成 → ファイルにリダイレクト
+    if (e && e.parameter && e.parameter.action === "createAgendaUser") {
+      const storeName = e.parameter.store || "";
+      const format    = e.parameter.format || "doc";
+      const memo      = decodeURIComponent(e.parameter.memo || "");
+      try {
+        const fileUrl = createAgendaExternal(storeName, format, memo);
+        const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>アジェンダ作成完了</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans JP',sans-serif;background:#f0f3f8;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.1);padding:36px 40px;text-align:center;max-width:440px;width:100%}.icon{font-size:48px;margin-bottom:16px}.ttl{font-size:18px;font-weight:700;color:#0f1623;margin-bottom:8px}.sub{font-size:13px;color:#8b93a8;margin-bottom:24px}.btn{display:inline-block;padding:12px 28px;background:#2563eb;color:#fff;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;}</style>
+</head><body><div class="card">
+<div class="icon">✅</div>
+<div class="ttl">アジェンダを作成しました</div>
+<div class="sub">${storeName} / ${format === "slide" ? "スライド" : "ドキュメント"}<br>あなたのGoogleドライブに保存されました。</div>
+<a class="btn" href="${fileUrl}" target="_blank">ファイルを開く →</a>
+</div><script>setTimeout(()=>window.location.href="${fileUrl}",2000);</script>
+</body></html>`;
+        return HtmlService.createHtmlOutput(html)
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      } catch(err) {
+        const errHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>エラー</title>
+<style>body{font-family:sans-serif;padding:40px;color:#dc2626;}</style></head>
+<body><h2>エラーが発生しました</h2><p>${err.message}</p></body></html>`;
+        return HtmlService.createHtmlOutput(errHtml);
+      }
+    }
 
     const ss = SpreadsheetApp.openById(SS_ID);
     const sheetNames = ss.getSheets().map(s => s.getName());
