@@ -14,6 +14,17 @@ const SHEET_CONFIG = "【眉毛】加盟店管理集計";
 // タスクボード列定義
 // A:店舗名 B:担当SV C:カテゴリ D:タスク名 E:ステータス F:優先度 G:メモ H:完了日
 
+// 売上明細（9~3月）列定義 ※略称列(A)挿入後
+const SC_ABBR  = 0;   // A: 略称
+const SC_NAME  = 1;   // B: 正式名称
+const SC_DATE  = 2;   // C: 日付(YYYYMMDD)
+const SC_KUBUN = 6;   // G: 区分
+const SC_CAT   = 8;   // I: カテゴリ
+const SC_CAT2  = 9;   // J: カテゴリ2
+const SC_COUNT = 12;  // M: 件数
+const SC_AMT   = 13;  // N: 金額
+const SC_STAFF = 14;  // O: スタッフ名
+
 function doGet(e) {
   try {
     // アジェンダ生成リクエスト（JSONデータ）
@@ -24,6 +35,10 @@ function doGet(e) {
         decodeURIComponent(e.parameter.memo || "")
       );
       return json(result);
+    }
+    // 売上明細に略称列を挿入: ?action=addAbbrColumn
+    if (e && e.parameter && e.parameter.action === "addAbbrColumn") {
+      return json({ result: addAbbrColumnToSales() });
     }
     // 売上データ同期実行: ?action=syncSalesData
     if (e && e.parameter && e.parameter.action === "syncSalesData") {
@@ -42,7 +57,7 @@ function doGet(e) {
       const rows2 = ws2.getDataRange().getValues();
       const nameCount = {};
       for (let i = 1; i < rows2.length; i++) {
-        const nm = String(rows2[i][0] || "").trim();
+        const nm = String(rows2[i][SC_NAME] || "").trim();
         if (nm) nameCount[nm] = (nameCount[nm] || 0) + 1;
       }
       return json({ total: Object.keys(nameCount).length, stores: nameCount });
@@ -60,15 +75,15 @@ function doGet(e) {
       let matchCount = 0, kubunCount = 0;
       const ymDist = {};
       for (let i = 1; i < rows2.length; i++) {
-        const store = String(rows2[i][0] || "").trim();
+        const store = String(rows2[i][SC_NAME] || "").trim();
         if (store !== officialName) continue;
         matchCount++;
-        const kubun = String(rows2[i][5] || "").trim();
-        const rawDate = rows2[i][1];
+        const kubun = String(rows2[i][SC_KUBUN] || "").trim();
+        const rawDate = rows2[i][SC_DATE];
         const dn = parseFloat(rawDate) || 0;
         const rowYM = Math.floor(dn / 100);
         ymDist[rowYM] = (ymDist[rowYM] || 0) + 1;
-        const mn = (String(rows2[i][7] || "") + " " + String(rows2[i][8] || "")).trim();
+        const mn = (String(rows2[i][SC_CAT] || "") + " " + String(rows2[i][SC_CAT2] || "")).trim();
         if (sample.length < 5) sample.push({ dn, rowYM, kubun, mn });
         if (kubun !== "施術") continue;
         kubunCount++;
@@ -555,14 +570,14 @@ function getStaffSales() {
   const nameMap = _getSalesNameMap();
   const map = {};
   for (let i = 1; i < rows.length; i++) {
-    const kubun    = String(rows[i][5] || "").trim();
-    const category = String(rows[i][7] || "").trim();
-    const menuName = String(rows[i][8] || "").trim();
-    const staffRaw = String(rows[i][13] || "").trim();
-    const amt      = parseFloat(rows[i][12]) || 0;
-    const cnt      = parseFloat(rows[i][11]) || 1;
-    const dateNum  = parseFloat(rows[i][1]) || 0;
-    const storeOfficial = String(rows[i][0] || "").trim();
+    const kubun    = String(rows[i][SC_KUBUN] || "").trim();
+    const category = String(rows[i][SC_CAT]   || "").trim();
+    const menuName = String(rows[i][SC_CAT2]  || "").trim();
+    const staffRaw = String(rows[i][SC_STAFF] || "").trim();
+    const amt      = parseFloat(rows[i][SC_AMT])   || 0;
+    const cnt      = parseFloat(rows[i][SC_COUNT]) || 1;
+    const dateNum  = parseFloat(rows[i][SC_DATE])  || 0;
+    const storeOfficial = String(rows[i][SC_NAME] || "").trim();
     // 正式名称を略称にマッピング（見つからなければそのまま）
     const store = nameMap.officialToAbbr[storeOfficial] || storeOfficial;
     if (!store || !staffRaw || staffRaw === "フリー 指名なし") continue;
@@ -904,17 +919,17 @@ function getMenuRatios(storeName, targetYM) {
     const nameMap = _getSalesNameMap();
     const officialName = nameMap.abbrToOfficial[storeName] || storeName;
     for (let i = 1; i < rows.length; i++) {
-      const store = String(rows[i][0] || "").trim();
+      const store = String(rows[i][SC_NAME] || "").trim();
       if (store !== officialName) continue;
-      const kubun = String(rows[i][5] || "").trim();
+      const kubun = String(rows[i][SC_KUBUN] || "").trim();
       if (kubun !== "施術") continue;
       if (targetYM) {
-        const dn = parseFloat(rows[i][1]) || 0;
+        const dn = parseFloat(rows[i][SC_DATE]) || 0;
         if (Math.floor(dn / 100) !== targetYM) continue;
       }
-      const mn = (String(rows[i][7] || "") + " " + String(rows[i][8] || "")).trim();
-      const cnt = parseFloat(rows[i][11]) || 1;
-      const amt = parseFloat(rows[i][12]) || 0;
+      const mn = (String(rows[i][SC_CAT] || "") + " " + String(rows[i][SC_CAT2] || "")).trim();
+      const cnt = parseFloat(rows[i][SC_COUNT]) || 1;
+      const amt = parseFloat(rows[i][SC_AMT]) || 0;
       const mnL = mn.toLowerCase();
       const hasMatsu   = mnL.includes("まつ毛パーマ") || mnL.includes("マツパ") || mnL.includes("まつパ")
                       || mnL.includes("パリジェンヌ") || mnL.includes("ラッシュリフト") || mnL.includes("lash lift")
@@ -1161,10 +1176,10 @@ function _getSalesNameMap() {
     const nm = String(r[2] || "").trim();
     if (nm && !abbrNames.includes(nm)) abbrNames.push(nm);
   });
-  // 正式名称一覧（売上明細 A列）- キャッシュ経由
+  // 正式名称一覧（売上明細 B列 = SC_NAME）- キャッシュ経由
   const officialNames = new Set();
   _getSalesRows().slice(1).forEach(r => {
-    const nm = String(r[0] || "").trim();
+    const nm = String(r[SC_NAME] || "").trim();
     if (nm) officialNames.add(nm);
   });
   // 略称 → 正式名称マッピング（ファジーマッチ）
@@ -1676,24 +1691,25 @@ function getStoreReport(storeName, staffYM) {
   const kubunMap = {};   // 区分ごとの集計（クーポン・割引含む）
 
   for (let i = 1; i < rows.length; i++) {
-    const store = String(rows[i][0] || "").trim();
+    const store = String(rows[i][SC_NAME] || "").trim();
     if (store !== officialName) continue;
 
-    const dn = parseFloat(rows[i][1]) || 0;
+    const dn = parseFloat(rows[i][SC_DATE]) || 0;
     const ym = Math.floor(dn / 100);
     if (!ym || ym < 200001) continue;
 
-    const kubun   = String(rows[i][5]  || "").trim();  // F列：区分
-    const category = String(rows[i][7] || "").trim();  // H列：カテゴリ
-    const amount  = parseFloat(rows[i][12]) || 0;      // M列：金額
-    const staff   = String(rows[i][13] || "").trim();  // N列：スタッフ名
-    const cnt     = parseFloat(rows[i][11]) || 1;      // L列：件数
+    const kubun    = String(rows[i][SC_KUBUN] || "").trim();
+    const category = String(rows[i][SC_CAT]   || "").trim();
+    const amount   = parseFloat(rows[i][SC_AMT])   || 0;
+    const staff    = String(rows[i][SC_STAFF] || "").trim();
+    const cnt      = parseFloat(rows[i][SC_COUNT]) || 1;
 
     // 区分ごとに集計（全種類）
-    if (kubun) {
-      if (!kubunMap[kubun]) kubunMap[kubun] = { count: 0, sales: 0 };
-      kubunMap[kubun].count += cnt;
-      kubunMap[kubun].sales += amount;
+    const rawKubun = kubun || String(rows[i][SC_KUBUN] || "").trim();
+    if (rawKubun) {
+      if (!kubunMap[rawKubun]) kubunMap[rawKubun] = { count: 0, sales: 0 };
+      kubunMap[rawKubun].count += cnt;
+      kubunMap[rawKubun].sales += amount;
     }
 
     if (!monthlyMap[ym]) monthlyMap[ym] = { sales: 0, serviceCount: 0 };
@@ -1741,6 +1757,55 @@ function getStoreReport(storeName, staffYM) {
     .map(([kubun, d]) => ({ kubun, count: d.count, sales: d.sales }));
 
   return { storeName, officialName, monthly, menus, staff, kubunSummary };
+}
+
+// =============================================
+// 売上明細 略称列挿入（一回だけ実行）
+// =============================================
+
+/**
+ * 売上明細シートの一番左に略称列(A)を挿入する。
+ * 既に挿入済みの場合は何もしない。
+ * GASエディタまたは ?action=addAbbrColumn から実行。
+ */
+function addAbbrColumnToSales() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_SALES);
+  if (!ws) throw new Error("売上明細シートなし");
+
+  // 既に挿入済みかチェック
+  const headerA = String(ws.getRange(1, 1).getValue()).trim();
+  if (headerA === "略称") {
+    Logger.log("略称列は既に挿入済みです");
+    return "already_done";
+  }
+
+  // キャッシュをリセットして正式名称→略称マップを構築（挿入前の旧構造で）
+  _salesRowsCache = null;
+  _salesNameCache = null;
+  const nameMap = _getSalesNameMap();
+
+  // 列Aの前に新列を挿入してヘッダー設定
+  ws.insertColumnBefore(1);
+  ws.getRange(1, 1).setValue("略称");
+
+  // B列（挿入後、旧A列=正式名称）を読んで略称をA列に書き込む
+  const lastRow = ws.getLastRow();
+  if (lastRow >= 2) {
+    const officials = ws.getRange(2, 2, lastRow - 1, 1).getValues();
+    const abbrs = officials.map(([nm]) => {
+      const official = String(nm || "").trim();
+      return [nameMap.officialToAbbr[official] || official];
+    });
+    ws.getRange(2, 1, abbrs.length, 1).setValues(abbrs);
+  }
+
+  // キャッシュをリセット（新構造で再読み込みされるように）
+  _salesRowsCache = null;
+  _salesNameCache = null;
+
+  Logger.log("略称列の挿入完了: " + (lastRow - 1) + "行");
+  return "done";
 }
 
 // =============================================
