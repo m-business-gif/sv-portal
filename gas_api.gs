@@ -1484,7 +1484,7 @@ function createAgendaDoc(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr, t
     ["推奨フェーズ", quadrant, "VIP または 優良新規"],
   ]);
   styleTableHeader(t3, 3, "#ede9fe");
-  body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環").editAsText().setFontSize(10).setForegroundColor("#64748b");
+  body.appendParagraph("集客サイクル: お試し層 → リピーター → VIP → 優良新規").editAsText().setFontSize(10).setForegroundColor("#64748b");
   body.appendParagraph("");
 
   // 3. メニュー構成比
@@ -1719,7 +1719,7 @@ function createAgendaSlides(title, s, sPrev, sPrevPrev, prevYMStr, prevPrevYMStr
   addBox(sl4,
     "新規比率: " + newPct + "% / 再来: " + (100 - newPct) + "%\n" +
     "客単価: ¥" + fmt(unitPrice) + "  （" + (unitPrice >= unitGoal ? "▲ 目標達成" : "▼ 目標未達") + "）\n\n" +
-    "集客サイクル: お試し層 → リピーター → VIP → 優良新規 → 増員 → 循環",
+    "集客サイクル: お試し層 → リピーター → VIP → 優良新規",
     15, CY+92, CW, CH-92, 13, false, "#94a3b8");
 
   // スライド5: 課題分析
