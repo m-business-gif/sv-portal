@@ -1362,14 +1362,14 @@ function renderSVTable(){
 
   // ── ヒートマップ ──
   const HM=[
-    {label:"店舗売上",  actF:s=>s.実績売上||0,       tgtF:s=>s.売上目標||0,       fmt:n=>"¥"+n.toLocaleString()},
-    {label:"新規数",    actF:s=>s.新規実績||0,        tgtF:s=>s.新規目標||0,       fmt:n=>n+"人"},
-    {label:"再来数",    actF:s=>s.再来実績||0,        tgtF:s=>s.再来目標||0,       fmt:n=>n+"人"},
-    {label:"総客数",    actF:s=>s.総客数実績||0,      tgtF:s=>s.総客数目標||0,     fmt:n=>n+"人"},
-    {label:"客単価",    actF:s=>s.客単価実績||0,      tgtF:s=>s.客単価目標||0,     fmt:n=>"¥"+Math.round(n).toLocaleString(), avg:true},
-    {label:"回数券売上",actF:s=>s.回数券売上実績||0,  tgtF:s=>s.回数券売上目標||0, fmt:n=>"¥"+n.toLocaleString()},
-    {label:"物販売上",  actF:s=>s.物販売上実績||0,    tgtF:null,                   fmt:n=>"¥"+n.toLocaleString()},
-    {label:"OP売上",    actF:null,                    tgtF:null,                   fmt:n=>"¥"+n.toLocaleString(), isOpt:true},
+    {label:"店舗売上",  actF:s=>s.見込み売上||0,      tgtF:s=>s.売上目標||0,       fmt:n=>"¥"+n.toLocaleString()},
+    {label:"新規数",    actF:s=>s.見込み新規||0,       tgtF:s=>s.新規目標||0,       fmt:n=>n+"人"},
+    {label:"再来数",    actF:s=>s.見込み再来||0,       tgtF:s=>s.再来目標||0,       fmt:n=>n+"人"},
+    {label:"総客数",    actF:s=>s.見込み総客数||0,     tgtF:s=>s.総客数目標||0,     fmt:n=>n+"人"},
+    {label:"客単価",    actF:s=>s.客単価実績||0,       tgtF:s=>s.客単価目標||0,     fmt:n=>"¥"+Math.round(n).toLocaleString(), avg:true},
+    {label:"回数券売上",actF:s=>s.見込み回数券||0,     tgtF:s=>s.回数券売上目標||0, fmt:n=>"¥"+n.toLocaleString()},
+    {label:"物販売上",  actF:s=>s.見込み物販||0,       tgtF:null,                   fmt:n=>"¥"+n.toLocaleString()},
+    {label:"OP売上",    actF:null,                     tgtF:null,                   fmt:n=>"¥"+n.toLocaleString(), isOpt:true},
   ];
   const optBySt={};
   staffSales.forEach(s=>{if(s.store&&s.avgOption)optBySt[s.store]=(optBySt[s.store]||0)+s.avgOption;});
@@ -1401,7 +1401,7 @@ function renderSVTable(){
   }).join("");
   const hmHTML=`<div style="background:var(--sur);border-radius:var(--r);padding:16px 20px;box-shadow:var(--sh);margin-bottom:16px">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:700;color:var(--ink)">SV別 進捗ヒートマップ</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink)">SV別 進捗ヒートマップ <span style="font-size:10px;font-weight:400;color:var(--ink3)">（客単価除き見込みベース）</span></div>
       <div style="display:flex;align-items:center;gap:10px;font-size:10px;color:var(--ink3)">
         <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:rgba(22,163,74,.25);border-radius:2px"></span>達成（100%+）</span>
         <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:rgba(217,119,6,.2);border-radius:2px"></span>注意（80-99%）</span>
