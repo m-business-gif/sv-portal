@@ -1131,12 +1131,17 @@ function closeModal(){const m=document.getElementById("task-modal");if(m)m.remov
 // ─ アジェンダモーダル ─
 function openAgendaModal(storeName){
   const html=`<div class="modal-overlay" id="agenda-modal" onclick="if(event.target===this)closeAgendaModal()">
-    <div class="modal-box" style="max-width:480px">
+    <div class="modal-box" style="max-width:540px">
       <div class="modal-head">
         <div class="modal-ttl">📋 アジェンダ作成 — ${storeName}</div>
         <button class="modal-close" onclick="closeAgendaModal()">✕</button>
       </div>
       <div class="modal-body">
+        <div id="agenda-preview-area" style="margin-bottom:12px">
+          <div id="agenda-preview-loading" style="text-align:center;padding:14px 0;color:var(--ink3);font-size:13px">
+            <span style="display:inline-block;animation:spin 1s linear infinite;margin-right:6px">⏳</span>売上データを取得中...
+          </div>
+        </div>
         <div class="form-field" style="margin-bottom:12px">
           <label class="form-label">出力形式</label>
           <div style="display:flex;gap:8px">
@@ -1150,7 +1155,7 @@ function openAgendaModal(storeName){
         </div>
         <div class="form-field">
           <label class="form-label">その他・自由記入</label>
-          <textarea class="form-inp full form-textarea" id="agenda-memo" placeholder="次回MTG日程、連絡事項など" style="min-height:80px"></textarea>
+          <textarea class="form-inp full form-textarea" id="agenda-memo" placeholder="次回MTG日程、連絡事項など" style="min-height:64px"></textarea>
         </div>
       </div>
       <div class="modal-foot">
@@ -1160,6 +1165,67 @@ function openAgendaModal(storeName){
     </div>
   </div>`;
   document.body.insertAdjacentHTML("beforeend",html);
+  // 売上集計から先月比・今月目標データを自動取得
+  _loadAgendaPreview(storeName);
+}
+async function _loadAgendaPreview(storeName){
+  try{
+    const res=await fetch(API_URL+"?action=getAgendaPreview&store="+encodeURIComponent(storeName));
+    const d=await res.json();
+    const area=document.getElementById("agenda-preview-area");
+    if(!area)return;
+    if(!d.ok){area.innerHTML=`<div style="font-size:12px;color:var(--ink3);padding:6px 0">${d.error||"データ取得失敗"}</div>`;return;}
+    const fmtN=n=>(n||0).toLocaleString();
+    const fmtTr=t=>{
+      if(!t)return'<span style="color:var(--ink3)">—</span>';
+      const col=t.sign==="▲"?"#16a34a":t.sign==="▼"?"#dc2626":"#64748b";
+      return`<span style="color:${col};font-weight:600">${t.sign}${t.pct}%</span>`;
+    };
+    const alert35=v=>v<35?`<span style="color:#dc2626;font-weight:700">${v}% ⚠</span>`:`<span style="color:#16a34a">${v}% ✓</span>`;
+    const cur=d.cur||{};const prev=d.prev||{};const mc=d.momComp||{};
+    const curYM=d.curYMStr||"今月";const prevYM=d.prevYMStr||"先月";
+    const html=`
+<div style="background:var(--sur2,#f8fafc);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-size:12px">
+  <div style="font-weight:700;color:var(--ink2);margin-bottom:8px;font-size:12px">
+    📊 売上集計データ（自動取得）
+    <span style="font-weight:400;color:var(--ink3);margin-left:6px">${prevYM}振り返り / ${curYM}進捗</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+    <div style="background:var(--sur);border-radius:6px;padding:8px;border:1px solid var(--bdr)">
+      <div style="font-weight:600;color:#2563eb;margin-bottom:5px;font-size:11px">${prevYM}振り返り</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">売上実績</span><span style="font-weight:600">¥${fmtN(prev.売上実績||0)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">達成率</span><span style="font-weight:600">${prev.達成率||0}%</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">新規</span><span>${prev.新規実績||0}人</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">再来</span><span>${prev.再来実績||0}人</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">客単価</span><span>¥${fmtN(prev.客単価実績||0)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--ink3)">次回予約率</span>${alert35(prev.次回予約率実績||0)}</div>
+    </div>
+    <div style="background:var(--sur);border-radius:6px;padding:8px;border:1px solid #059669;border-left:3px solid #059669">
+      <div style="font-weight:600;color:#059669;margin-bottom:5px;font-size:11px">${curYM}今月進捗</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">売上実績</span><span style="font-weight:600">¥${fmtN(cur.売上実績||0)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">見込み達成率</span><span style="font-weight:600">${cur.見込み達成率||0}%</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">新規</span><span>${cur.新規実績||0}人</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">再来</span><span>${cur.再来実績||0}人</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--ink3)">客単価</span><span>¥${fmtN(cur.客単価実績||0)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--ink3)">次回予約率</span>${alert35(cur.次回予約率実績||0)}</div>
+    </div>
+  </div>
+  <div style="background:var(--sur);border-radius:6px;padding:7px 10px;border:1px solid var(--bdr)">
+    <div style="font-weight:600;color:var(--ink2);margin-bottom:5px;font-size:11px">先月比（${curYM}実績 vs ${prevYM}実績）</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div>売上 ${fmtTr(mc.売上)}</div>
+      <div>総客数 ${fmtTr(mc.総客数)}</div>
+      <div>新規 ${fmtTr(mc.新規)}</div>
+      <div>再来 ${fmtTr(mc.再来)}</div>
+      <div>客単価 ${fmtTr(mc.客単価)}</div>
+    </div>
+  </div>
+</div>`;
+    area.innerHTML=html;
+  }catch(e){
+    const area=document.getElementById("agenda-preview-area");
+    if(area)area.innerHTML=`<div style="font-size:12px;color:var(--ink3);padding:4px 0">データ取得エラー: ${e.message}</div>`;
+  }
 }
 function closeAgendaModal(){const m=document.getElementById("agenda-modal");if(m)m.remove();}
 async function generateAgenda(storeName){
