@@ -1359,6 +1359,67 @@ async function postTask(store,taskData){
 function renderSVTable(){
   const el=document.getElementById("v-sv");if(!el)return;
   const svs=[...new Set(stores.map(s=>s.sv))].sort();
+
+  // ── ヒートマップ ──
+  const HM=[
+    {label:"店舗売上",  actF:s=>s.実績売上||0,       tgtF:s=>s.売上目標||0,       fmt:n=>"¥"+n.toLocaleString()},
+    {label:"新規数",    actF:s=>s.新規実績||0,        tgtF:s=>s.新規目標||0,       fmt:n=>n+"人"},
+    {label:"再来数",    actF:s=>s.再来実績||0,        tgtF:s=>s.再来目標||0,       fmt:n=>n+"人"},
+    {label:"総客数",    actF:s=>s.総客数実績||0,      tgtF:s=>s.総客数目標||0,     fmt:n=>n+"人"},
+    {label:"客単価",    actF:s=>s.客単価実績||0,      tgtF:s=>s.客単価目標||0,     fmt:n=>"¥"+Math.round(n).toLocaleString(), avg:true},
+    {label:"回数券売上",actF:s=>s.回数券売上実績||0,  tgtF:s=>s.回数券売上目標||0, fmt:n=>"¥"+n.toLocaleString()},
+    {label:"物販売上",  actF:s=>s.物販売上実績||0,    tgtF:null,                   fmt:n=>"¥"+n.toLocaleString()},
+    {label:"OP売上",    actF:null,                    tgtF:null,                   fmt:n=>"¥"+n.toLocaleString(), isOpt:true},
+  ];
+  const optBySt={};
+  staffSales.forEach(s=>{if(s.store&&s.avgOption)optBySt[s.store]=(optBySt[s.store]||0)+s.avgOption;});
+  const hmRows=svs.map(sv=>{
+    const d=stores.filter(s=>s.sv===sv);
+    const cells=HM.map(m=>{
+      let act,tgt;
+      if(m.isOpt){
+        act=d.reduce((a,s)=>a+(optBySt[s.name]||0),0); tgt=null;
+      } else if(m.avg){
+        act=d.length?d.reduce((a,s)=>a+m.actF(s),0)/d.length:0;
+        tgt=m.tgtF&&d.length?d.reduce((a,s)=>a+m.tgtF(s),0)/d.length:null;
+      } else {
+        act=d.reduce((a,s)=>a+m.actF(s),0);
+        tgt=m.tgtF?d.reduce((a,s)=>a+m.tgtF(s),0):null;
+      }
+      const pct=(tgt&&tgt>0)?Math.round(act/tgt*100):null;
+      const bg=pct===null?"transparent":pct>=100?"rgba(22,163,74,.14)":pct>=80?"rgba(217,119,6,.14)":"rgba(220,38,38,.14)";
+      const clr=pct===null?"var(--ink2)":pct>=100?"var(--grn)":pct>=80?"var(--amb)":"var(--red)";
+      return `<td style="text-align:center;padding:9px 8px;background:${bg};border-radius:7px;min-width:72px;border:1px solid ${pct===null?"var(--bdr2)":pct>=100?"rgba(22,163,74,.2)":pct>=80?"rgba(217,119,6,.2)":"rgba(220,38,38,.2)"}">
+        ${pct!==null?`<div style="font-size:16px;font-weight:800;color:${clr};line-height:1.1">${pct}%</div>`:""}
+        <div style="font-size:10px;color:var(--ink3);margin-top:${pct!==null?2:0}px">${m.fmt(Math.round(act))}</div>
+      </td>`;
+    }).join("");
+    return `<tr>
+      <td style="padding:6px 10px;white-space:nowrap;vertical-align:middle"><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:${svc(sv)};flex-shrink:0"></div><strong style="font-size:13px">${sv}</strong><span style="font-size:10px;color:var(--ink3)">${d.length}店</span></div></td>
+      ${cells}
+    </tr>`;
+  }).join("");
+  const hmHTML=`<div style="background:var(--sur);border-radius:var(--r);padding:16px 20px;box-shadow:var(--sh);margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:700;color:var(--ink)">SV別 進捗ヒートマップ</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:10px;color:var(--ink3)">
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:rgba(22,163,74,.25);border-radius:2px"></span>達成（100%+）</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:rgba(217,119,6,.2);border-radius:2px"></span>注意（80-99%）</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:rgba(220,38,38,.18);border-radius:2px"></span>遅れ（-79%）</span>
+        <span style="color:var(--ink4)">※OP売上は月平均推計</span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="border-collapse:separate;border-spacing:4px">
+        <thead><tr>
+          <th style="text-align:left;padding:4px 10px;font-size:10px;color:var(--ink3)">SV</th>
+          ${HM.map(m=>`<th style="text-align:center;padding:4px 8px;font-size:10px;color:var(--ink3);white-space:nowrap;min-width:72px">${m.label}</th>`).join("")}
+        </tr></thead>
+        <tbody>${hmRows}</tbody>
+      </table>
+    </div>
+  </div>`;
+
   const rows=svs.map(sv=>{
     const d=stores.filter(s=>s.sv===sv);
     const tgt=d.reduce((a,s)=>a+(s.売上目標||0),0);
@@ -1391,7 +1452,7 @@ function renderSVTable(){
   const totRoyalMk=stores.reduce((a,s)=>a+(s.見込みロイヤリティ||0),0);
   const totRoyalPct=totRoyalTgt?Math.round(totRoyal/totRoyalTgt*100):0;
   const totRoyalMkPct=totRoyalTgt?Math.round(totRoyalMk/totRoyalTgt*100):0;
-  el.innerHTML=`<div class="svt-mob-wrap"><table class="svt">
+  el.innerHTML=hmHTML+`<div class="svt-mob-wrap"><table class="svt">
     <thead><tr><th>SV</th><th>担当店舗</th><th>売上実績 / 目標</th><th>達成率</th><th>見込み達成率</th><th>達成店舗</th><th>ロイヤリティ実績（達成率）</th><th style="background:var(--acc2);color:var(--acc)">ロイヤリティ見込み（目標比）</th></tr></thead>
     <tbody>${rows.join("")}
     <tr style="font-weight:700;background:var(--sur2)">
