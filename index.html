@@ -1376,12 +1376,12 @@ function renderSVTable(){
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:${svc(sv)};flex-shrink:0"></div><strong>${sv}</strong></div></td>
       <td class="num">${d.length}店</td>
-      <td class="num">¥${fm(act)} / ¥${fm(tgt)}</td>
+      <td class="num">¥${act.toLocaleString()} / ¥${tgt.toLocaleString()}</td>
       <td class="num" style="color:${pcc(p)};font-weight:700">${p}%</td>
       <td class="num" style="color:${pcc(mp)};font-weight:700">${mp}%</td>
       <td class="num">${ok} / ${d.length}</td>
-      <td class="num"><div>¥${fm(royal)}<span style="font-size:11px;color:${pcc(royalPct)};font-weight:700;margin-left:5px">${royalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(royalTgt)}</div></td>
-      <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(royalMkPct)}">¥${fm(royalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(royalMkPct)}">${royalMkPct}%</div><div style="font-size:10px;color:var(--ink3)">目標比</div></td>
+      <td class="num"><div>¥${royal.toLocaleString()}<span style="font-size:11px;color:${pcc(royalPct)};font-weight:700;margin-left:5px">${royalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${royalTgt.toLocaleString()}</div></td>
+      <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(royalMkPct)}">¥${royalMk.toLocaleString()}</div><div style="font-size:11px;font-weight:700;color:${pcc(royalMkPct)}">${royalMkPct}%</div><div style="font-size:10px;color:var(--ink3)">目標比</div></td>
     </tr>`;
   });
   const T=stores.reduce((a,s)=>a+(s.売上目標||0),0),A=stores.reduce((a,s)=>a+(s.実績売上||0),0),MK=stores.reduce((a,s)=>a+(s.見込み売上||0),0);
@@ -1396,12 +1396,12 @@ function renderSVTable(){
     <tbody>${rows.join("")}
     <tr style="font-weight:700;background:var(--sur2)">
       <td>合計</td><td class="num">${stores.length}店</td>
-      <td class="num">¥${fm(A)} / ¥${fm(T)}</td>
+      <td class="num">¥${A.toLocaleString()} / ¥${T.toLocaleString()}</td>
       <td class="num" style="color:${pcc(P)};font-weight:700">${P}%</td>
       <td class="num" style="color:${pcc(MP)};font-weight:700">${MP}%</td>
       <td class="num">${stores.filter(s=>(s.達成率||0)>=100).length} / ${stores.length}</td>
-      <td class="num"><div>¥${fm(totRoyal)}<span style="font-size:11px;color:${pcc(totRoyalPct)};font-weight:700;margin-left:5px">${totRoyalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${fm(totRoyalTgt)}</div></td>
-      <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(totRoyalMkPct)}">¥${fm(totRoyalMk)}</div><div style="font-size:11px;font-weight:700;color:${pcc(totRoyalMkPct)}">${totRoyalMkPct}%</div></td>
+      <td class="num"><div>¥${totRoyal.toLocaleString()}<span style="font-size:11px;color:${pcc(totRoyalPct)};font-weight:700;margin-left:5px">${totRoyalPct}%</span></div><div style="font-size:10.5px;color:var(--ink3)">目標 ¥${totRoyalTgt.toLocaleString()}</div></td>
+      <td class="num" style="background:var(--acc2)"><div style="font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;color:${pcc(totRoyalMkPct)}">¥${totRoyalMk.toLocaleString()}</div><div style="font-size:11px;font-weight:700;color:${pcc(totRoyalMkPct)}">${totRoyalMkPct}%</div></td>
     </tr></tbody>
   </table></div>`;
 }
