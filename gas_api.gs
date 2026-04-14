@@ -1993,6 +1993,7 @@ function getStoreReport(storeName, staffYM) {
   const rows = _getSalesRows();
   if (!rows.length) return { error: "売上明細シートなし" };
 
+  const normOfficialName = _normalizeForMatch(officialName);
   const salesMonthSet = new Set(); // 売上明細に存在する月
   const menuMap = {};
   const monthlyMenuMap = {};
@@ -2003,7 +2004,7 @@ function getStoreReport(storeName, staffYM) {
 
   for (let i = 1; i < rows.length; i++) {
     const store = String(rows[i][SC_NAME] || "").trim();
-    if (store !== officialName) continue;
+    if (_normalizeForMatch(store) !== normStore && _normalizeForMatch(store) !== normOfficialName) continue;
 
     const dn = parseFloat(rows[i][SC_DATE]) || 0;
     const ym = Math.floor(dn / 100);

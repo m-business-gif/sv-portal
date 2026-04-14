@@ -2186,8 +2186,8 @@ function renderStoreReport(d,body){
     <!-- メニュー構成（選択月） -->
     <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh);margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:4px">メニュー構成比 <span id="rpt-menu-label" style="font-weight:400;color:var(--ink3)"></span></div>
-      <div style="display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:flex-start;margin-top:10px">
-        <canvas id="rpt-c-menu-cnt" width="140" height="140"></canvas>
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:flex-start;margin-top:10px">
+        <canvas id="rpt-c-menu-cnt" width="180" height="180"></canvas>
         <div id="rpt-menu-tbl" style="overflow-x:auto"></div>
       </div>
     </div>
@@ -2271,7 +2271,13 @@ function renderStoreReport(d,body){
         stack:"s"
       }))
     },
-    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+c.raw+"%"}}},
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11},boxWidth:12,padding:8}},tooltip:{callbacks:{
+      label:c=>{
+        const mi=monthlyMenus.findIndex(m=>m.label===c.label);
+        const cnt=mi>=0?monthlyMenus[mi].counts[c.datasetIndex]:0;
+        return c.dataset.label+": "+c.raw+"%"+(cnt?" ("+cnt+"件)":"");
+      }
+    }}},
       scales:{x:{stacked:true},y:{stacked:true,max:100,ticks:{callback:v=>v+"%"},grid:{color:"rgba(0,0,0,.04)"}}}}
   });
 
@@ -2318,23 +2324,24 @@ function updateReportMonthView(ym){
     _rptCharts["menuCnt"]=new Chart(menuEl,{
       type:"doughnut",
       data:{labels:allMenuNames,datasets:[{data:counts,backgroundColor:CC.slice(0,allMenuNames.length),borderWidth:2,borderColor:"var(--bg)"}]},
-      options:{responsive:false,cutout:"60%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+c.raw+"件 ("+( totalCnt>0?Math.round(c.raw/totalCnt*100):0)+"%)"}}}}}
+      options:{responsive:false,cutout:"55%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+c.raw+"件 ("+( totalCnt>0?Math.round(c.raw/totalCnt*100):0)+"%)"}}}}}
     );
   }
   const tbl=document.getElementById("rpt-menu-tbl");
   if(tbl){
-    tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px">
+    const sorted=[...allMenuNames.map((name,i)=>({name,count:counts[i],color:CC[i%CC.length]}))].sort((a,b)=>b.count-a.count);
+    tbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="border-bottom:1px solid var(--bdr)">
-        <th style="text-align:left;padding:4px;color:var(--ink3)">メニュー</th>
-        <th style="text-align:right;padding:4px;color:var(--ink3)">件数</th>
-        <th style="text-align:right;padding:4px;color:var(--ink3)">構成比</th>
+        <th style="text-align:left;padding:5px 4px;color:var(--ink3)">メニュー</th>
+        <th style="text-align:right;padding:5px 4px;color:var(--ink3)">件数</th>
+        <th style="text-align:right;padding:5px 4px;color:var(--ink3)">構成比</th>
       </tr></thead>
-      <tbody>${allMenuNames.map((name,i)=>`<tr style="border-bottom:1px solid var(--bdr2)">
-        <td style="padding:4px;display:flex;align-items:center;gap:5px">
-          <span style="width:8px;height:8px;border-radius:2px;background:${CC[i%CC.length]};flex-shrink:0;display:inline-block"></span>${name}
+      <tbody>${sorted.filter(r=>r.count>0).map(r=>`<tr style="border-bottom:1px solid var(--bdr2)">
+        <td style="padding:5px 4px;display:flex;align-items:center;gap:6px">
+          <span style="width:10px;height:10px;border-radius:2px;background:${r.color};flex-shrink:0;display:inline-block"></span>${r.name}
         </td>
-        <td style="text-align:right;color:var(--ink2)">${counts[i]}</td>
-        <td style="text-align:right;font-weight:600">${totalCnt>0?Math.round(counts[i]/totalCnt*100):0}%</td>
+        <td style="text-align:right;color:var(--ink2);font-weight:600">${r.count}</td>
+        <td style="text-align:right;font-weight:700;color:${r.count/totalCnt>.3?"#2563eb":r.count/totalCnt>.15?"var(--ink)":"var(--ink2)"}">${totalCnt>0?Math.round(r.count/totalCnt*100):0}%</td>
       </tr>`).join("")}</tbody>
     </table>`;
   }
