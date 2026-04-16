@@ -10,6 +10,7 @@ const SHEET_MIKOMI = "見込み数値";
 const SHEET_STAFF  = "スタッフランク";
 const SHEET_SALES  = "売上明細（9~3月）";
 const SHEET_CONFIG = "【眉毛】加盟店管理集計";
+const SHEET_KARTE  = "スタッフカルテ";
 
 // タスクボード列定義
 // A:店舗名 B:担当SV C:カテゴリ D:タスク名 E:ステータス F:優先度 G:メモ H:完了日
@@ -130,6 +131,10 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action === "getAgendaPreview") {
       return json(getAgendaPreview(e.parameter.store || ""));
     }
+    // スタッフカルテ取得: ?action=getStaffKarte&store=店舗名&staff=スタッフ名
+    if (e && e.parameter && e.parameter.action === "getStaffKarte") {
+      return json(getStaffKarteFn(e.parameter.store || "", e.parameter.staff || ""));
+    }
     // アジェンダ外部ファイル生成（Google Docs/Slides）
     if (e && e.parameter && e.parameter.action === "createAgendaExternal") {
       const url = createAgendaExternal(
@@ -228,6 +233,15 @@ function doPost(e) {
     if (data.action === "createAgenda") {
       const result = createAgenda(data.store, data.format || "doc", data.memo || "");
       return json({ ok: true, html: result.html, title: result.title });
+    }
+    if (data.action === "analyzeMinutes") {
+      return json(analyzeMinutesFn(data.store, data.staff, data.text, data.staffInfo || {}));
+    }
+    if (data.action === "saveStaffKarte") {
+      return json(saveStaffKarteFn(data));
+    }
+    if (data.action === "deleteStaffKarte") {
+      return json(deleteStaffKarteFn(data.row));
     }
     if (data.action === "repairGoalSheet") {
       const count = repairGoalSheetFn();
@@ -2382,4 +2396,112 @@ function authorizeDocAccess() {
 
 function json(data) {
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// =============================================
+// スタッフカルテ機能
+// =============================================
+
+function _initKarteSheet() {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  let ws = ss.getSheetByName(SHEET_KARTE);
+  if (!ws) {
+    ws = ss.insertSheet(SHEET_KARTE);
+    ws.getRange(1,1,1,6).setValues([["店舗名","スタッフ名","面談日","議事録原文","分析結果JSON","記録者SV"]]);
+    ws.getRange(1,1,1,6).setFontWeight("bold").setBackground("#f1f5f9");
+    ws.setColumnWidth(4, 400);
+    ws.setColumnWidth(5, 400);
+  }
+  return ws;
+}
+
+function getStaffKarteFn(store, staffName) {
+  const ws = _initKarteSheet();
+  const normStore = _normalizeForMatch(store);
+  const normStaff = _normalizeForMatch(staffName);
+  const rows = ws.getDataRange().getValues();
+  const records = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    const rs = _normalizeForMatch(String(rows[i][0]));
+    const rn = _normalizeForMatch(String(rows[i][1]));
+    if (rs !== normStore || rn !== normStaff) continue;
+    let analysis = null;
+    try { analysis = JSON.parse(String(rows[i][4] || "{}")); } catch(e) { analysis = null; }
+    records.push({
+      row:     i + 1,
+      store:   String(rows[i][0]),
+      staff:   String(rows[i][1]),
+      date:    rows[i][2] ? Utilities.formatDate(new Date(rows[i][2]), "Asia/Tokyo", "yyyy-MM-dd") : "",
+      rawText: String(rows[i][3] || ""),
+      analysis,
+      sv:      String(rows[i][5] || "")
+    });
+  }
+  records.reverse(); // 新しい順
+  return { ok: true, records };
+}
+
+function saveStaffKarteFn(data) {
+  const ws = _initKarteSheet();
+  const analysisStr = data.analysis ? JSON.stringify(data.analysis) : "";
+  const dateVal = data.date || Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy-MM-dd");
+  if (data.row && data.row > 1) {
+    ws.getRange(data.row, 1, 1, 6).setValues([[data.store, data.staff, dateVal, data.rawText, analysisStr, data.sv || ""]]);
+  } else {
+    ws.appendRow([data.store, data.staff, dateVal, data.rawText, analysisStr, data.sv || ""]);
+  }
+  return { ok: true };
+}
+
+function deleteStaffKarteFn(row) {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  const ws = ss.getSheetByName(SHEET_KARTE);
+  if (!ws || row < 2) return { ok: false, error: "invalid row" };
+  ws.deleteRow(row);
+  return { ok: true };
+}
+
+function analyzeMinutesFn(store, staffName, rawText, staffInfo) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty("ANTHROPIC_API_KEY");
+  if (!apiKey) return { ok: false, error: "APIキー未設定: GASスクリプトプロパティに ANTHROPIC_API_KEY を設定してください" };
+  if (!rawText || rawText.trim().length < 20) return { ok: false, error: "議事録が短すぎます" };
+
+  const statsLine = staffInfo.avg ? `月平均売上¥${Math.round(staffInfo.avg).toLocaleString()} / 物販¥${Math.round(staffInfo.avgBussan||0).toLocaleString()} / 回数券${staffInfo.avgKaisu||0}件 / OP¥${Math.round(staffInfo.avgOption||0).toLocaleString()} / 指名${staffInfo.avgShimei||0}名 / ランク${staffInfo.rank||"未"}` : "";
+
+  const prompt = `あなたは美容サロンチェーンの経営コンサルタントです。以下のスタッフ面談議事録を読んで、コンサルタント視点で分析してください。
+
+【スタッフ情報】
+店舗: ${store} / 名前: ${staffName}${statsLine ? "\n数値: " + statsLine : ""}
+
+【面談議事録】
+${rawText}
+
+以下のJSONのみを返してください（マークダウン・説明文は不要）:
+{"特性":"このスタッフの人物像・特性を2〜3文で","強み":["強み1","強み2"],"課題":["課題1","課題2"],"推奨アクション":["SVが取るべき具体的アクション1","アクション2"],"総合評価":"コンサルタントとしての評価と今後の見通し2〜3文"}`;
+
+  try {
+    const res = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      payload: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }]
+      }),
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) return { ok: false, error: "Anthropic API error " + res.getResponseCode() };
+    const body = JSON.parse(res.getContentText());
+    const text = body.content[0].text;
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return { ok: false, error: "JSON取得失敗", raw: text };
+    return { ok: true, analysis: JSON.parse(match[0]) };
+  } catch(err) {
+    return { ok: false, error: err.toString() };
+  }
 }
