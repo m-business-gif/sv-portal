@@ -2255,9 +2255,9 @@ function renderStoreReport(d,body){
 
     <!-- 月別メニュー比率推移 -->
     <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh);margin-bottom:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:2px">メニュー比率の変化（月別・%）</div>
-      <div style="font-size:10px;color:var(--ink3);margin-bottom:8px">各メニューの構成割合が月ごとにどう変わっているか</div>
-      <canvas id="rpt-c-mmpct" height="130"></canvas>
+      <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:2px">メニュー比率の推移（月別・%）</div>
+      <div style="font-size:10px;color:var(--ink3);margin-bottom:8px">線が上がれば構成比が増加・下がれば減少</div>
+      <canvas id="rpt-c-mmpct" height="160"></canvas>
     </div>
 
     <!-- スタッフ + 区分 -->
@@ -2318,28 +2318,28 @@ function renderStoreReport(d,body){
       scales:{y1:{position:"left",grid:{color:"rgba(0,0,0,.04)"}},y2:{position:"right",ticks:{callback:v=>v.toLocaleString()+"円"},grid:{display:false}}}}
   });
 
-  // メニュー比率推移（全期間・%積み上げ）
+  // メニュー比率推移（折れ線グラフ）
   const mmTotals=monthlyMenus.map(m=>allMenuNames.reduce((s,_,i)=>s+m.counts[i],0));
   _destroyChart("mmpct");
   _rptCharts["mmpct"]=new Chart(document.getElementById("rpt-c-mmpct"),{
-    type:"bar",
+    type:"line",
     data:{
       labels:monthlyMenus.map(m=>m.label),
-      datasets:allMenuNames.map((name,i)=>({
-        label:name,
-        data:monthlyMenus.map((m,mi)=>mmTotals[mi]>0?+(m.counts[i]/mmTotals[mi]*100).toFixed(1):0),
-        backgroundColor:CC[i%CC.length],
-        stack:"s"
-      }))
+      datasets:allMenuNames.map((name,i)=>{
+        const pcts=monthlyMenus.map((m,mi)=>mmTotals[mi]>0?+(m.counts[i]/mmTotals[mi]*100).toFixed(1):null);
+        return {label:name,data:pcts,borderColor:CC[i%CC.length],backgroundColor:CC[i%CC.length]+"28",borderWidth:2.5,pointRadius:4,pointHoverRadius:6,tension:0.3,fill:false,spanGaps:true};
+      })
     },
-    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11},boxWidth:12,padding:8}},tooltip:{callbacks:{
-      label:c=>{
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:11},boxWidth:12,padding:8,usePointStyle:true}},tooltip:{
+      mode:"index",intersect:false,
+      callbacks:{label:c=>{
+        if(c.raw===null)return null;
         const mi=monthlyMenus.findIndex(m=>m.label===c.label);
         const cnt=mi>=0?monthlyMenus[mi].counts[c.datasetIndex]:0;
         return c.dataset.label+": "+c.raw+"%"+(cnt?" ("+cnt+"件)":"");
-      }
-    }}},
-      scales:{x:{stacked:true},y:{stacked:true,max:100,ticks:{callback:v=>v+"%"},grid:{color:"rgba(0,0,0,.04)"}}}}
+      }}
+    }},
+    scales:{y:{min:0,ticks:{callback:v=>v+"%"},grid:{color:"rgba(0,0,0,.05)"}},x:{grid:{display:false}}}}
   });
 
   // 月別ビュー（選択月分）を描画
