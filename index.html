@@ -1697,6 +1697,7 @@ function renderStaff(){
     svStores.forEach(store=>{
       const sr=Object.values(allStaff).filter(s=>s.store===store.name)
         .sort((a,b)=>b.avg-a.avg);
+      sr.forEach(s=>{ _karteStaffMap[store.name+"|"+s.name]={store:store.name,data:s}; });
       html+=`<div style="background:var(--sur1);border:1px solid var(--bdr);border-radius:10px;padding:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div style="font-weight:700;font-size:13px">${store.name}</div>
@@ -1712,7 +1713,7 @@ function renderStaff(){
                 <span style="flex:1;font-size:12.5px;font-weight:600">${s.name}</span>
                 ${s.avg?`<span style="font-size:11px;color:var(--ink3)">月平均 <strong style="color:var(--ink1)">${Math.round(s.avg/10000)}万</strong></span>`:""}
                 ${s.total?`<span style="font-size:11px;color:var(--ink3)">計 <strong style="color:var(--ink1)">${s.total}点</strong></span>`:""}
-                <button onclick="openStaffKarte('${store.name.replace(/'/g,"\\'")}','${s.name.replace(/'/g,"\\'")}',${JSON.stringify(s).replace(/</g,'\\u003c')})" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--acc);color:var(--acc);background:transparent;cursor:pointer;white-space:nowrap">カルテ</button>
+                <button onclick="_openKarteById('${(store.name+'|'+s.name).replace(/'/g,"\\'")}',this)" data-karte-store="${store.name.replace(/"/g,'&quot;')}" data-karte-staff="${s.name.replace(/"/g,'&quot;')}" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--acc);color:var(--acc);background:transparent;cursor:pointer;white-space:nowrap">カルテ</button>
               </div>
               ${months.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
                 ${months.map(([m,v])=>`<span style="font-size:10px;background:var(--sur1);padding:2px 6px;border-radius:4px;color:var(--ink3)">${MONTH_NAMES[m]||m+"月"} <strong style="color:var(--ink2)">${Math.round(v/10000)}万</strong></span>`).join("")}
@@ -1735,9 +1736,18 @@ function renderStaff(){
 
 
 // ─ スタッフカルテ ─
-let _karteAnalysis = null; // 分析結果の一時保存
+let _karteAnalysis = null;
+let _karteCtx = {}; // 現在開いているカルテのコンテキスト
+const _karteStaffMap = {};
+
+function _openKarteById(key) {
+  const entry = _karteStaffMap[key];
+  if (!entry) return;
+  openStaffKarte(entry.store, entry.data.name, entry.data);
+}
 
 function openStaffKarte(store, staffName, staffData) {
+  _karteCtx = { store, staffName, staffData };
   const c = RANK_COLORS[staffData.rank] || {bg:"var(--sur2)",color:"var(--ink2)",icon:"👤"};
   const statItems = [
     {label:"月平均売上", val:`¥${Math.round((staffData.avg||0)/10000*10)/10}万`},
@@ -1791,12 +1801,12 @@ function openStaffKarte(store, staffName, staffData) {
           <div style="font-size:10px;color:var(--ink3);margin-bottom:4px">議事録（貼り付けると自動分析）</div>
           <textarea id="karte-minutes" rows="7" placeholder="面談の内容をここに貼り付けてください。自動的にコンサルタント視点で分析されます。"
             style="width:100%;padding:10px;border:1px solid var(--bdr);border-radius:6px;font-size:12px;background:var(--bg);color:var(--ink);resize:vertical;box-sizing:border-box;line-height:1.6"
-            oninput="_karteOnInput(this,'${store.replace(/'/g,"\\'")}','${staffName.replace(/'/g,"\\'")}',${JSON.stringify(staffData).replace(/</g,'\\u003c')})"></textarea>
+            oninput="_karteOnInput(this)"></textarea>
           <!-- 分析結果エリア -->
           <div id="karte-analysis-area" style="margin-top:10px;display:none"></div>
           <!-- 保存ボタン -->
           <div style="margin-top:12px;display:flex;justify-content:flex-end">
-            <button id="karte-save-btn" onclick="_saveKarte('${store.replace(/'/g,"\\'")}','${staffName.replace(/'/g,"\\'")}',${JSON.stringify(staffData).replace(/</g,'\\u003c')})"
+            <button id="karte-save-btn" onclick="_saveKarte()"
               style="padding:8px 20px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" disabled>保存</button>
           </div>
         </div>
@@ -1873,7 +1883,8 @@ function _renderKarteRecord(r) {
 }
 
 let _karteDebounce = null;
-function _karteOnInput(ta, store, staffName, staffData) {
+function _karteOnInput(ta) {
+  const {store, staffName, staffData} = _karteCtx;
   _karteAnalysis = null;
   document.getElementById("karte-save-btn").disabled = true;
   const area = document.getElementById("karte-analysis-area");
@@ -1930,7 +1941,8 @@ async function _analyzeKarte(store, staffName, staffData, text) {
   }
 }
 
-async function _saveKarte(store, staffName, staffData) {
+async function _saveKarte() {
+  const {store, staffName, staffData} = _karteCtx;
   const btn = document.getElementById("karte-save-btn");
   const ta = document.getElementById("karte-minutes");
   const dateEl = document.getElementById("karte-date");
@@ -1955,7 +1967,7 @@ async function _saveKarte(store, staffName, staffData) {
       _karteAnalysis = null;
       document.getElementById("karte-analysis-area").style.display = "none";
       btn.textContent = "✓ 保存済み";
-      await _loadKarteHistory(store, staffName);
+      await _loadKarteHistory(store, staffName, staffData);
       setTimeout(() => { btn.textContent = "保存"; btn.disabled = true; }, 1500);
     } else {
       btn.textContent = "保存失敗";
