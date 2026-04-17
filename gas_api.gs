@@ -2468,6 +2468,7 @@ function _setupGeminiKey(key) {
   return "OK";
 }
 
+
 function analyzeMinutesFn(store, staffName, rawText, staffInfo) {
   const apiKey = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
   if (!apiKey) return { ok: false, error: "APIキー未設定: GASスクリプトプロパティに GEMINI_API_KEY を設定してください" };
