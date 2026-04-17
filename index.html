@@ -506,7 +506,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbzEBiBnk0Uij5tjmy9jqSco8JfvXLZEMVxjOIaWpAlxm_PAH-iiE_qDcHizHEV1pgXT/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbwqfztncN0jYep6ouXe5PmTChO5WK0L8OUBiyKODKCr5simZ82qfCp6oc4pme0B5Cam/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
@@ -1716,7 +1716,7 @@ function renderStaff(){
                 <button onclick="_openKarteById('${(store.name+'|'+s.name).replace(/'/g,"\\'")}',this)" data-karte-store="${store.name.replace(/"/g,'&quot;')}" data-karte-staff="${s.name.replace(/"/g,'&quot;')}" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--acc);color:var(--acc);background:transparent;cursor:pointer;white-space:nowrap">カルテ</button>
               </div>
               ${months.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">
-                ${months.map(([m,v])=>`<span style="font-size:10px;background:var(--sur1);padding:2px 6px;border-radius:4px;color:var(--ink3)">${MONTH_NAMES[m]||m+"月"} <strong style="color:var(--ink2)">${Math.round(v/10000)}万</strong></span>`).join("")}
+                ${months.map(([m,v])=>`<span style="font-size:10px;background:var(--sur1);padding:2px 6px;border-radius:4px;color:var(--ink3)">${ymLabel(m)} <strong style="color:var(--ink2)">${Math.round(v/10000)}万</strong></span>`).join("")}
               </div>`:""}
               ${renderStaffActions(s)}
             </div>`;

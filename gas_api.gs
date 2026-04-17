@@ -652,22 +652,23 @@ function getStaffSales() {
     // 正式名称を略称にマッピング（見つからなければそのまま）
     const store = nameMap.officialToAbbr[storeOfficial] || storeOfficial;
     if (!store || !staffRaw || staffRaw === "フリー 指名なし") continue;
-    const month = Math.floor(dateNum / 100) % 100;
+    const ym = Math.floor(dateNum / 100); // YYYYMM（年込みで正確に月管理）
+    if (ym < 200001) continue;
     const key = store + "|" + staffRaw;
     if (!map[key]) map[key] = { store, name: staffRaw, sales: {}, bussan: {}, kaisu: {}, option: {}, shimei: {} };
     if (amt > 0) {
-      if (kubun === "施術") map[key].sales[month] = (map[key].sales[month] || 0) + amt;
-      else if (kubun === "店販" && !category.includes("指名料")) map[key].sales[month] = (map[key].sales[month] || 0) + amt;
-      else if (kubun === "その他" && category === "オプション") map[key].sales[month] = (map[key].sales[month] || 0) + amt;
+      if (kubun === "施術") map[key].sales[ym] = (map[key].sales[ym] || 0) + amt;
+      else if (kubun === "店販" && !category.includes("指名料")) map[key].sales[ym] = (map[key].sales[ym] || 0) + amt;
+      else if (kubun === "その他" && category === "オプション") map[key].sales[ym] = (map[key].sales[ym] || 0) + amt;
     }
     if (kubun === "店販" && !category.includes("指名料") && !category.includes("回数券") && amt > 0)
-      map[key].bussan[month] = (map[key].bussan[month] || 0) + amt;
+      map[key].bussan[ym] = (map[key].bussan[ym] || 0) + amt;
     if ((kubun === "施術" || kubun === "その他") && (category.includes("回数券") || menuName.includes("回数券")))
-      map[key].kaisu[month] = (map[key].kaisu[month] || 0) + cnt;
+      map[key].kaisu[ym] = (map[key].kaisu[ym] || 0) + cnt;
     if (kubun === "施術" && amt > 0 && (category.includes("オプション") || category.includes("OP") || menuName.includes("オプション") || menuName.includes("OP")))
-      map[key].option[month] = (map[key].option[month] || 0) + amt;
+      map[key].option[ym] = (map[key].option[ym] || 0) + amt;
     if (kubun === "店販" && category.includes("指名料"))
-      map[key].shimei[month] = (map[key].shimei[month] || 0) + 1;
+      map[key].shimei[ym] = (map[key].shimei[ym] || 0) + 1;
   }
   const result = [];
   Object.values(map).forEach(s => {
