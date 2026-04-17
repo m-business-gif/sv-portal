@@ -2488,7 +2488,7 @@ ${rawText}
 {"特性":"このスタッフの人物像・特性を2〜3文で","強み":["強み1","強み2"],"課題":["課題1","課題2"],"推奨アクション":["SVが取るべき具体的アクション1","アクション2"],"総合評価":"コンサルタントとしての評価と今後の見通し2〜3文"}`;
 
   try {
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=" + apiKey;
     const res = UrlFetchApp.fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
