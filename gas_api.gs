@@ -2462,9 +2462,14 @@ function deleteStaffKarteFn(row) {
   return { ok: true };
 }
 
+function _setupGeminiKey(key) {
+  PropertiesService.getScriptProperties().setProperty("GEMINI_API_KEY", key);
+  return "OK";
+}
+
 function analyzeMinutesFn(store, staffName, rawText, staffInfo) {
-  const apiKey = PropertiesService.getScriptProperties().getProperty("ANTHROPIC_API_KEY");
-  if (!apiKey) return { ok: false, error: "APIキー未設定: GASスクリプトプロパティに ANTHROPIC_API_KEY を設定してください" };
+  const apiKey = PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY");
+  if (!apiKey) return { ok: false, error: "APIキー未設定: GASスクリプトプロパティに GEMINI_API_KEY を設定してください" };
   if (!rawText || rawText.trim().length < 20) return { ok: false, error: "議事録が短すぎます" };
 
   const statsLine = staffInfo.avg ? `月平均売上¥${Math.round(staffInfo.avg).toLocaleString()} / 物販¥${Math.round(staffInfo.avgBussan||0).toLocaleString()} / 回数券${staffInfo.avgKaisu||0}件 / OP¥${Math.round(staffInfo.avgOption||0).toLocaleString()} / 指名${staffInfo.avgShimei||0}名 / ランク${staffInfo.rank||"未"}` : "";
@@ -2481,23 +2486,19 @@ ${rawText}
 {"特性":"このスタッフの人物像・特性を2〜3文で","強み":["強み1","強み2"],"課題":["課題1","課題2"],"推奨アクション":["SVが取るべき具体的アクション1","アクション2"],"総合評価":"コンサルタントとしての評価と今後の見通し2〜3文"}`;
 
   try {
-    const res = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    const res = UrlFetchApp.fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
-      },
+      headers: { "Content-Type": "application/json" },
       payload: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }]
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
       }),
       muteHttpExceptions: true
     });
-    if (res.getResponseCode() !== 200) return { ok: false, error: "Anthropic API error " + res.getResponseCode() };
+    if (res.getResponseCode() !== 200) return { ok: false, error: "Gemini API error " + res.getResponseCode() + ": " + res.getContentText() };
     const body = JSON.parse(res.getContentText());
-    const text = body.content[0].text;
+    const text = body.candidates[0].content.parts[0].text;
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return { ok: false, error: "JSON取得失敗", raw: text };
     return { ok: true, analysis: JSON.parse(match[0]) };
