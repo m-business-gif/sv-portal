@@ -1912,7 +1912,7 @@ async function _analyzeKarte(store, staffName, staffData, text) {
   try {
     const statsLine = staffData.avg ? `月平均売上¥${Math.round(staffData.avg).toLocaleString()} / 物販¥${Math.round(staffData.avgBussan||0).toLocaleString()} / 回数券${staffData.avgKaisu||0}件 / OP¥${Math.round(staffData.avgOption||0).toLocaleString()} / 指名${staffData.avgShimei||0}名 / ランク${staffData.rank||"未"}` : "";
     const prompt = `あなたは美容サロンチェーンの経営コンサルタントです。以下のスタッフ面談議事録を読んで、コンサルタント視点で分析してください。\n\n【スタッフ情報】\n店舗: ${store} / 名前: ${staffName}${statsLine ? "\n数値: " + statsLine : ""}\n\n【面談議事録】\n${text}\n\n以下のJSONのみを返してください（マークダウン・説明文は不要）:\n{"特性":"このスタッフの人物像・特性を2〜3文で","強み":["強み1","強み2"],"課題":["課題1","課題2"],"推奨アクション":["SVが取るべき具体的アクション1","アクション2"],"総合評価":"コンサルタントとしての評価と今後の見通し2〜3文"}`;
-    const gemRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${apiKey}`, {
+    const gemRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } })
