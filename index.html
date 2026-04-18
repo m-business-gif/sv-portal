@@ -506,7 +506,7 @@ const pcc=p=>p>=100?"var(--grn)":p>=80?"var(--amb)":"var(--red)";
 const fk=n=>{n=n||0;if(n>=10000)return(n/10000).toFixed(1)+"万";return n.toLocaleString()};
 const fm=n=>{n=n||0;if(n>=100000000)return(n/100000000).toFixed(1)+"億";if(n>=10000)return Math.round(n/10000)+"万";return n.toLocaleString()};
 
-const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbyY8nOdTrFWTA5LqyaYQZzKUuUuHW8Pxx5KFG6Nh6p0HJftFCo2D83dq_FZmSEwtJkN/exec";
+const DEFAULT_API_URL="https://script.google.com/macros/s/AKfycbzd5CKCu7yyOth7Gfn6CeuyVZe-wEwmBcpfpqeLr_mhpjMB1Tl2nm-f__XVwo5B_2kw/exec";
 const stored_url=localStorage.getItem("gas_url");
 // 古いURLが保存されていたら自動でリセット
 if(stored_url&&stored_url!==DEFAULT_API_URL&&!stored_url.startsWith("http://localhost")){localStorage.removeItem("gas_url");}
@@ -1805,9 +1805,7 @@ function openStaffKarte(store, staffName, staffData) {
           <!-- 分析結果エリア -->
           <div id="karte-analysis-area" style="margin-top:10px;display:none"></div>
           <!-- 保存ボタン -->
-          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
-            <button onclick="localStorage.removeItem('gemini-api-key');alert('APIキーをリセットしました。次回分析時に再入力してください。')" title="Groq APIキー（gsk_...）をリセット"
-              style="padding:6px 12px;background:none;color:var(--ink3);border:1px solid var(--bdr);border-radius:6px;font-size:11px;cursor:pointer">🔑 APIキーリセット</button>
+          <div style="margin-top:12px;display:flex;justify-content:flex-end">
             <button id="karte-save-btn" onclick="_saveKarte()"
               style="padding:8px 20px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" disabled>保存</button>
           </div>
@@ -1900,37 +1898,12 @@ function _karteOnInput(ta) {
 async function _analyzeKarte(store, staffName, staffData, text) {
   const area = document.getElementById("karte-analysis-area");
   if (!area) return;
-  // Gemini APIキーをlocalStorageから取得、なければ入力を求める
-  let apiKey = localStorage.getItem("gemini-api-key") || "";
-  if (!apiKey) {
-    apiKey = prompt("Groq APIキーを入力してください（https://console.groq.com/keys で無料取得・gsk_で始まるキー）:");
-    if (!apiKey || !apiKey.trim()) {
-      area.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px;background:var(--sur);border-radius:6px">APIキーが入力されていません</div>`;
-      return;
-    }
-    localStorage.setItem("gemini-api-key", apiKey.trim());
-    apiKey = apiKey.trim();
-  }
   try {
-    const statsLine = staffData.avg ? `月平均売上¥${Math.round(staffData.avg).toLocaleString()} / 物販¥${Math.round(staffData.avgBussan||0).toLocaleString()} / 回数券${staffData.avgKaisu||0}件 / OP¥${Math.round(staffData.avgOption||0).toLocaleString()} / 指名${staffData.avgShimei||0}名 / ランク${staffData.rank||"未"}` : "";
-    const prompt = `あなたは美容サロンチェーンの経営コンサルタントです。以下のスタッフ面談議事録を読んで、コンサルタント視点で分析してください。\n\n【スタッフ情報】\n店舗: ${store} / 名前: ${staffName}${statsLine ? "\n数値: " + statsLine : ""}\n\n【面談議事録】\n${text}\n\n以下のJSONのみを返してください（マークダウン・説明文は不要）:\n{"特性":"このスタッフの人物像・特性を2〜3文で","強み":["強み1","強み2"],"課題":["課題1","課題2"],"推奨アクション":["SVが取るべき具体的アクション1","アクション2"],"総合評価":"コンサルタントとしての評価と今後の見通し2〜3文"}`;
-    const gemRes = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
+    const res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-      body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: prompt }], temperature: 0.3, max_tokens: 1024 })
+      body: JSON.stringify({ action: "analyzeMinutes", store, staff: staffName, text, staffInfo: staffData })
     });
-    if (!gemRes.ok) {
-      const errBody = await gemRes.text();
-      if (gemRes.status === 401 || gemRes.status === 403) {
-        localStorage.removeItem("gemini-api-key");
-      }
-      area.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px;background:var(--sur);border-radius:6px">⚠ AI API error ${gemRes.status}: ${errBody.slice(0,200)}</div>`;
-      return;
-    }
-    const gemData = await gemRes.json();
-    const rawText2 = gemData.choices?.[0]?.message?.content || "";
-    const match = rawText2.match(/\{[\s\S]*\}/);
-    const data = match ? { ok: true, analysis: JSON.parse(match[0]) } : { ok: false, error: "JSON取得失敗: " + rawText2.slice(0,100) };
+    const data = await res.json();
     if (!data.ok) {
       area.innerHTML = `<div style="font-size:12px;color:var(--red);padding:8px;background:var(--sur);border-radius:6px">⚠ ${data.error}</div>`;
       return;
