@@ -1805,7 +1805,9 @@ function openStaffKarte(store, staffName, staffData) {
           <!-- 分析結果エリア -->
           <div id="karte-analysis-area" style="margin-top:10px;display:none"></div>
           <!-- 保存ボタン -->
-          <div style="margin-top:12px;display:flex;justify-content:flex-end">
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <button onclick="localStorage.removeItem('gemini-api-key');alert('APIキーをリセットしました。次回分析時に再入力してください。')"
+              style="padding:6px 12px;background:none;color:var(--ink3);border:1px solid var(--bdr);border-radius:6px;font-size:11px;cursor:pointer">🔑 APIキーリセット</button>
             <button id="karte-save-btn" onclick="_saveKarte()"
               style="padding:8px 20px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" disabled>保存</button>
           </div>
