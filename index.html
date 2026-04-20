@@ -2469,34 +2469,51 @@ function switchReportMonth(){
 
 function renderStoreReport(d,body){
   const CC=["#2563eb","#7c3aed","#0891b2","#059669","#c2410c","#d97706","#db2777","#65a30d","#0284c7","#9333ea","#b45309","#0f766e"];
-  const monthly=d.monthly||[];
+  const allMonthly=d.monthly||[];
+  // 直近6ヶ月に絞る
+  const monthly=allMonthly.slice(-6);
   const allMenuNames=(d.allMenuNames||[]).slice(0,8);
-  const monthlyMenus=d.monthlyMenus||[];
+  const monthlyMenus=(d.monthlyMenus||[]).filter(m=>monthly.some(mo=>mo.ym===m.ym));
 
-  // デフォルト：最新月
   const latestYM=monthly.length?monthly[monthly.length-1].ym:0;
 
   body.innerHTML=`
     <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:17px;font-weight:700;font-family:'Outfit',sans-serif">${d.storeName}</span>
       <select class="sel" id="rpt-ym-sel" style="min-width:100px" onchange="switchReportMonth()">
-        ${monthly.map(m=>`<option value="${m.ym}"${m.ym===latestYM?" selected":""}>${m.ym.toString().slice(0,4)}/${m.ym.toString().slice(4)}</option>`).reverse().join("")}
+        ${allMonthly.map(m=>`<option value="${m.ym}"${m.ym===latestYM?" selected":""}>${m.ym.toString().slice(0,4)}/${m.ym.toString().slice(4)}</option>`).reverse().join("")}
       </select>
-      <span style="font-size:11px;color:var(--ink3)">（データ: ${monthly.length}ヶ月分）</span>
+      <span style="font-size:11px;color:var(--ink3)">（直近6ヶ月表示・全${allMonthly.length}ヶ月分）</span>
     </div>
 
     <!-- サマリーカード（月別） -->
-    <div id="rpt-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
+    <div id="rpt-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"></div>
 
-    <!-- トレンドグラフ（全期間） -->
+    <!-- 6ヶ月トレンドグラフ -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
-        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">売上推移（全期間）</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">売上推移（直近6ヶ月）</div>
         <canvas id="rpt-c-sales" height="160"></canvas>
       </div>
       <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
-        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">施術数・客単価推移</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">客数・客単価推移</div>
         <canvas id="rpt-c-unit" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- 稼働率トレンド + 予約経路 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">稼働率推移（直近6ヶ月）</div>
+        <div style="font-size:10px;color:var(--ink3);margin-bottom:6px">総客数×平均施術時間 ÷ スタッフ×480分×営業日</div>
+        <canvas id="rpt-c-util" height="140"></canvas>
+      </div>
+      <div style="background:var(--sur);border-radius:var(--r);padding:14px;box-shadow:var(--sh)">
+        <div style="font-size:11px;font-weight:700;color:var(--ink2);margin-bottom:8px">予約経路 <span id="rpt-route-label" style="font-weight:400;color:var(--ink3)"></span></div>
+        <div style="display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;margin-top:6px">
+          <canvas id="rpt-c-route" width="150" height="150"></canvas>
+          <div id="rpt-route-tbl"></div>
+        </div>
       </div>
     </div>
 
@@ -2548,7 +2565,7 @@ function renderStoreReport(d,body){
 
   const mLabels=monthly.map(m=>m.label);
 
-  // 売上推移（全期間）- 選択月をハイライト
+  // 売上推移（直近6ヶ月）
   _destroyChart("sales");
   _rptCharts["sales"]=new Chart(document.getElementById("rpt-c-sales"),{
     type:"bar",
@@ -2562,16 +2579,31 @@ function renderStoreReport(d,body){
       scales:{y:{ticks:{callback:v=>fm(v)},grid:{color:"rgba(0,0,0,.04)"}}}}
   });
 
-  // 施術数 + 客単価
+  // 客数（棒）+ 客単価（折れ線）
   _destroyChart("unit");
   _rptCharts["unit"]=new Chart(document.getElementById("rpt-c-unit"),{
     type:"bar",
     data:{labels:mLabels,datasets:[
-      {label:"施術数",data:monthly.map(m=>m.serviceCount),backgroundColor:"rgba(124,58,237,.5)",borderRadius:4,yAxisID:"y1"},
+      {label:"総客数",data:monthly.map(m=>m.totalGuest||0),backgroundColor:"rgba(124,58,237,.5)",borderRadius:4,yAxisID:"y1"},
       {label:"客単価",data:monthly.map(m=>m.unitPrice),type:"line",borderColor:"#c2410c",backgroundColor:"transparent",pointRadius:4,pointBackgroundColor:monthly.map(m=>m.ym===latestYM?"#c2410c":"#c2410c88"),yAxisID:"y2",tension:.3}
     ]},
-    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>c.datasetIndex===1?"¥"+c.raw.toLocaleString()+"円":c.raw+"件"}}},
+    options:{responsive:true,plugins:{legend:{position:"bottom",labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>c.datasetIndex===1?"¥"+c.raw.toLocaleString()+"円":c.raw+"人"}}},
       scales:{y1:{position:"left",grid:{color:"rgba(0,0,0,.04)"}},y2:{position:"right",ticks:{callback:v=>v.toLocaleString()+"円"},grid:{display:false}}}}
+  });
+
+  // 稼働率推移
+  _destroyChart("util");
+  _rptCharts["util"]=new Chart(document.getElementById("rpt-c-util"),{
+    type:"line",
+    data:{labels:mLabels,datasets:[{
+      label:"稼働率(%)",
+      data:monthly.map(m=>m.utilizationRate),
+      borderColor:"#059669",backgroundColor:"rgba(5,150,105,.12)",
+      pointRadius:5,pointBackgroundColor:monthly.map(m=>m.ym===latestYM?"#059669":"#05966988"),
+      borderWidth:2.5,tension:.3,fill:true,spanGaps:true
+    }]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw!=null?c.raw+"%":"データなし"}}},
+      scales:{y:{min:0,max:100,ticks:{callback:v=>v+"%"},grid:{color:"rgba(0,0,0,.04)"}}}}
   });
 
   // メニュー比率推移（折れ線グラフ）
@@ -2616,11 +2648,42 @@ function updateReportMonthView(ym){
   // サマリーカード
   const cards=document.getElementById("rpt-cards");
   if(cards){
-    const card=(label,val)=>`<div style="background:var(--sur);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)">
+    const card=(label,val,sub)=>`<div style="background:var(--sur);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)">
       <div style="font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">${label}</div>
       <div style="font-size:19px;font-weight:700;font-family:'Outfit',sans-serif">${val}</div>
+      ${sub?`<div style="font-size:10px;color:var(--ink3);margin-top:2px">${sub}</div>`:""}
     </div>`;
-    cards.innerHTML=card(ymLabel+" 売上",fm(mo.sales))+card(ymLabel+" 施術数",mo.serviceCount+"件")+card(ymLabel+" 客単価",mo.unitPrice.toLocaleString()+"円");
+    const utilVal=mo.utilizationRate!=null?mo.utilizationRate+"%":"—";
+    const utilSub=mo.utilizationRate!=null?`客数${mo.totalGuest||0}人・スタッフ${mo.availableMins>0?Math.round(mo.availableMins/480/((new Set()).size||1)):"?"}人`:"売上明細データなし";
+    cards.innerHTML=card(ymLabel+" 売上",fm(mo.sales))+card(ymLabel+" 総客数",(mo.totalGuest||0)+"人")+card(ymLabel+" 客単価",(mo.unitPrice||0).toLocaleString()+"円")+card(ymLabel+" 稼働率",utilVal);
+  }
+
+  // 予約経路（選択月）
+  const routeLbl=document.getElementById("rpt-route-label");
+  if(routeLbl)routeLbl.textContent=ymLabel;
+  _destroyChart("route");
+  const routeEl=document.getElementById("rpt-c-route");
+  const routeTbl=document.getElementById("rpt-route-tbl");
+  const routes=mo.routes||[];
+  if(routeEl&&routes.length){
+    const rLabels=routes.map(r=>r.route);
+    const rCounts=routes.map(r=>r.count);
+    const rTotal=rCounts.reduce((s,v)=>s+v,0);
+    const RC=["#2563eb","#7c3aed","#0891b2","#059669","#c2410c","#d97706","#db2777"];
+    _rptCharts["route"]=new Chart(routeEl,{
+      type:"doughnut",
+      data:{labels:rLabels,datasets:[{data:rCounts,backgroundColor:RC.slice(0,rLabels.length),borderWidth:2,borderColor:"var(--bg)"}]},
+      options:{responsive:false,cutout:"55%",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+": "+c.raw+"件 ("+Math.round(c.raw/rTotal*100)+"%)"}}}}}
+    );
+    if(routeTbl)routeTbl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px">
+      ${routes.map((r,i)=>`<tr style="border-bottom:1px solid var(--bdr2)">
+        <td style="padding:4px 2px;display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:${RC[i%RC.length]};display:inline-block;flex-shrink:0"></span>${r.route}</td>
+        <td style="text-align:right;font-weight:600;padding:4px 2px">${r.count}件</td>
+        <td style="text-align:right;color:var(--ink3);padding:4px 2px">${rTotal>0?Math.round(r.count/rTotal*100):0}%</td>
+      </tr>`).join("")}
+    </table>`;
+  } else if(routeEl){
+    if(routeTbl)routeTbl.innerHTML=`<div style="font-size:12px;color:var(--ink3)">この月の予約経路データなし</div>`;
   }
 
   // 売上推移グラフ：選択月をハイライト
