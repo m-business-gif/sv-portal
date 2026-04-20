@@ -529,6 +529,16 @@ window.addEventListener("DOMContentLoaded",()=>{
   localStorage.setItem("last_month",curMonth);
   setUserUI();
   renderContent();
+  // 自動更新：5分ごとにデータ再取得 ＆ 月またぎ検知で即時リロード
+  setInterval(()=>{
+    const m=new Date().toISOString().slice(0,7);
+    if(m!==localStorage.getItem("last_month")){
+      localStorage.setItem("last_month",m);
+      location.reload();  // 月が変わったらページごとリロード（確実に当月に切替）
+    } else {
+      loadData();  // 同月内は静かにデータだけ再取得
+    }
+  }, 5*60*1000);  // 5分ごと
 });
 
 function setUserUI(){
